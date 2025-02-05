@@ -2,67 +2,68 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>基于 Interact.js 的可拖拽 & 可缩放 - 布局持久化 + 2小时历史</title>
-
-  <!-- 1) 引入 jQuery（可选，用于 Ajax/DOM 等，不再用 jQuery UI） -->
+  <title>响应式布局 - 2小时历史 + 持仓保存</title>
+  <!-- 引入 jQuery（用于 Ajax/DOM 操作） -->
   <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-
-  <!-- 2) 引入 Interact.js（替代 jQuery UI / Touch Punch 来实现拖拽+缩放） -->
-  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-
-  <!-- 3) 引入 Chart.js -->
+  <!-- 引入 Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
-    /* 基础重置 */
+    /* ========= 重置样式 ========= */
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
     }
     body {
-      position: relative;
       background-color: #f2f2f2;
       font-family: "Helvetica Neue", Arial, sans-serif;
       color: #333;
     }
-
     header {
       background-color: #0d6efd;
       color: #fff;
       padding: 20px;
       text-align: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
     }
     header h1 {
       margin: 0;
       font-size: 24px;
     }
-
-    /* 面板样式 */
-    .panel {
+    /* ========= 主容器 ========= */
+    .container {
+      width: 95%;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    /* ========= Flex 布局 ========= */
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .col {
       background: #fff;
       border: 1px solid #ddd;
       border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
       padding: 16px;
-      position: absolute;  /* 必须absolute，才能用left/top控制位置 */
-      overflow: visible;   /* 不用hidden, 以免阻挡touch */
+      flex: 1;
+      min-width: 280px;
     }
-    .panel:hover {
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    .col:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-
     .panel-title {
       margin: 0 0 10px;
       padding-bottom: 4px;
       font-size: 18px;
       color: #0d6efd;
       border-bottom: 1px solid #eee;
-      user-select: none; /* 避免选中文本 */
-      cursor: move;      /* 提示可拖拽 */
     }
-
+    /* ========= 表单与表格 ========= */
     label {
       display: block;
       margin-bottom: 5px;
@@ -77,11 +78,10 @@
       border-radius: 4px;
       font-size: 14px;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 8px 0;
+      margin: 10px 0;
     }
     table, th, td {
       border: 1px solid #ddd;
@@ -104,8 +104,7 @@
       color: #666;
       font-size: 14px;
     }
-
-    /* 图表 */
+    /* ========= 图表 ========= */
     .chart-latest-value {
       text-align: center;
       margin-bottom: 5px;
@@ -116,318 +115,171 @@
       width: 100%;
       height: 220px;
     }
+    /* ========= 响应式调整 ========= */
+    @media (max-width: 767px) {
+      .col {
+        flex: 100%;
+      }
+    }
   </style>
 </head>
-
 <body>
   <header>
-    <h1>基于 Interact.js 的拖拽 & 缩放 - 布局持久化 + 2小时历史</h1>
+    <h1>响应式布局 - 2小时历史 + 持仓保存</h1>
   </header>
 
-  <!-- 
-    本示例包含 5 个面板：
-      1) cryptoPanel       (虚拟资产输入表单+显示)
-      2) stockPanel        (美股输入表单+显示)
-      3) chartCryptoPanel  (虚拟资产图表)
-      4) chartStocksPanel  (美股图表)
-      5) chartCombinedPanel(总资产图表)
+  <div class="container">
+    <!-- 第一行：输入面板 -->
+    <div class="row">
+      <!-- 虚拟资产输入面板 -->
+      <div class="col" id="cryptoPanel">
+        <h3 class="panel-title">虚拟资产</h3>
+        <form>
+          <label for="btcInput">BTC 数量</label>
+          <input type="number" id="btcInput" step="any">
+          <label for="ethInput">ETH 数量</label>
+          <input type="number" id="ethInput" step="any">
+          <label for="suiInput">SUI 数量</label>
+          <input type="number" id="suiInput" step="any">
+          <label for="enaInput">ENA 数量</label>
+          <input type="number" id="enaInput" step="any">
+        </form>
+        <table>
+          <thead>
+            <tr>
+              <th>币种</th>
+              <th>价格(USDT)</th>
+              <th>数量</th>
+              <th>总值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>BTC</td>
+              <td id="btcPrice">--</td>
+              <td id="btcQty">--</td>
+              <td id="btcValue">--</td>
+            </tr>
+            <tr>
+              <td>ETH</td>
+              <td id="ethPrice">--</td>
+              <td id="ethQty">--</td>
+              <td id="ethValue">--</td>
+            </tr>
+            <tr>
+              <td>SUI</td>
+              <td id="suiPrice">--</td>
+              <td id="suiQty">--</td>
+              <td id="suiValue">--</td>
+            </tr>
+            <tr>
+              <td>ENA</td>
+              <td id="enaPrice">--</td>
+              <td id="enaQty">--</td>
+              <td id="enaValue">--</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="total">虚拟资产合计</td>
+              <td id="cryptoTotal" class="total">--</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="status" id="cryptoWsStatus">币安WS：未连接</div>
+      </div>
 
-    需要用 Interact.js 改写拖拽/缩放并做布局持久化
-  -->
+      <!-- 美股输入面板 -->
+      <div class="col" id="stockPanel">
+        <h3 class="panel-title">美股资产</h3>
+        <form>
+          <label for="tslaInput">TSLA 数量</label>
+          <input type="number" id="tslaInput" step="any">
+          <label for="nvdaInput">NVDA 数量</label>
+          <input type="number" id="nvdaInput" step="any">
+        </form>
+        <table>
+          <thead>
+            <tr>
+              <th>股票</th>
+              <th>价格(USD)</th>
+              <th>数量</th>
+              <th>总值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>TSLA</td>
+              <td id="tslaPrice">--</td>
+              <td id="tslaQty">--</td>
+              <td id="tslaValue">--</td>
+            </tr>
+            <tr>
+              <td>NVDA</td>
+              <td id="nvdaPrice">--</td>
+              <td id="nvdaQty">--</td>
+              <td id="nvdaValue">--</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="total">美股资产合计</td>
+              <td id="stockTotal" class="total">--</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="status" id="stockStatus">美股数据：未请求</div>
+      </div>
+    </div> <!-- /.row -->
 
-  <!-- (1) 虚拟资产 面板 -->
-  <div id="cryptoPanel" class="panel" 
-       style="left: 30px; top: 120px; width: 360px; height: 400px;">
-    <h3 class="panel-title">虚拟资产</h3>
-    <form>
-      <label for="btcInput">BTC 数量</label>
-      <input type="number" id="btcInput" step="any">
-      <label for="ethInput">ETH 数量</label>
-      <input type="number" id="ethInput" step="any">
-      <label for="suiInput">SUI 数量</label>
-      <input type="number" id="suiInput" step="any">
-      <label for="enaInput">ENA 数量</label>
-      <input type="number" id="enaInput" step="any">
-    </form>
-    <table>
-      <thead>
-        <tr>
-          <th>币种</th>
-          <th>价格(USDT)</th>
-          <th>数量</th>
-          <th>总值</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>BTC</td>
-          <td id="btcPrice">--</td>
-          <td id="btcQty">--</td>
-          <td id="btcValue">--</td>
-        </tr>
-        <tr>
-          <td>ETH</td>
-          <td id="ethPrice">--</td>
-          <td id="ethQty">--</td>
-          <td id="ethValue">--</td>
-        </tr>
-        <tr>
-          <td>SUI</td>
-          <td id="suiPrice">--</td>
-          <td id="suiQty">--</td>
-          <td id="suiValue">--</td>
-        </tr>
-        <tr>
-          <td>ENA</td>
-          <td id="enaPrice">--</td>
-          <td id="enaQty">--</td>
-          <td id="enaValue">--</td>
-        </tr>
-        <tr>
-          <td colspan="3" class="total">虚拟资产合计</td>
-          <td id="cryptoTotal" class="total">--</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="status" id="cryptoWsStatus">币安WS：未连接</div>
-  </div>
-
-  <!-- (2) 美股资产 面板 -->
-  <div id="stockPanel" class="panel"
-       style="left: 420px; top: 120px; width: 360px; height: 300px;">
-    <h3 class="panel-title">美股资产</h3>
-    <form>
-      <label for="tslaInput">TSLA 数量</label>
-      <input type="number" id="tslaInput" step="any">
-      <label for="nvdaInput">NVDA 数量</label>
-      <input type="number" id="nvdaInput" step="any">
-    </form>
-    <table>
-      <thead>
-        <tr>
-          <th>股票</th>
-          <th>价格(USD)</th>
-          <th>数量</th>
-          <th>总值</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>TSLA</td>
-          <td id="tslaPrice">--</td>
-          <td id="tslaQty">--</td>
-          <td id="tslaValue">--</td>
-        </tr>
-        <tr>
-          <td>NVDA</td>
-          <td id="nvdaPrice">--</td>
-          <td id="nvdaQty">--</td>
-          <td id="nvdaValue">--</td>
-        </tr>
-        <tr>
-          <td colspan="3" class="total">美股资产合计</td>
-          <td id="stockTotal" class="total">--</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="status" id="stockStatus">美股数据：未请求</div>
-  </div>
-
-  <!-- (3) 虚拟资产图表 面板 -->
-  <div id="chartCryptoPanel" class="panel"
-       style="left: 800px; top: 120px; width: 400px; height: 320px;">
-    <h3 class="panel-title">虚拟资产总价值</h3>
-    <div class="chart-latest-value" id="chartCryptoLatest">最新: -- USDT</div>
-    <div class="chart-container">
-      <canvas id="chartCrypto"></canvas>
-    </div>
-  </div>
-
-  <!-- (4) 美股图表 面板 -->
-  <div id="chartStocksPanel" class="panel"
-       style="left: 30px; top: 560px; width: 400px; height: 320px;">
-    <h3 class="panel-title">美股总价值</h3>
-    <div class="chart-latest-value" id="chartStocksLatest">最新: -- USD</div>
-    <div class="chart-container">
-      <canvas id="chartStocks"></canvas>
-    </div>
-  </div>
-
-  <!-- (5) 总资产图表 面板 -->
-  <div id="chartCombinedPanel" class="panel"
-       style="left: 450px; top: 420px; width: 400px; height: 300px;">
-    <h3 class="panel-title">总资产 (虚拟 + 美股)</h3>
-    <div class="chart-latest-value" id="chartCombinedLatest">最新: -- USD</div>
-    <div class="chart-container">
-      <canvas id="chartCombined"></canvas>
-    </div>
-  </div>
+    <!-- 第二行：图表面板 -->
+    <div class="row">
+      <!-- 虚拟资产图表 -->
+      <div class="col" id="chartCryptoPanel">
+        <h3 class="panel-title">虚拟资产总价值</h3>
+        <div class="chart-latest-value" id="chartCryptoLatest">最新: -- USDT</div>
+        <div class="chart-container">
+          <canvas id="chartCrypto"></canvas>
+        </div>
+      </div>
+      <!-- 美股图表 -->
+      <div class="col" id="chartStocksPanel">
+        <h3 class="panel-title">美股总价值</h3>
+        <div class="chart-latest-value" id="chartStocksLatest">最新: -- USD</div>
+        <div class="chart-container">
+          <canvas id="chartStocks"></canvas>
+        </div>
+      </div>
+      <!-- 总资产图表 -->
+      <div class="col" id="chartCombinedPanel">
+        <h3 class="panel-title">总资产 (虚拟 + 美股)</h3>
+        <div class="chart-latest-value" id="chartCombinedLatest">最新: -- USD</div>
+        <div class="chart-container">
+          <canvas id="chartCombined"></canvas>
+        </div>
+      </div>
+    </div> <!-- /.row -->
+  </div> <!-- /.container -->
 
   <script>
     /***************************************************
-     *  A. 面板布局保存
-     ***************************************************/
-    let panelLayouts = {
-      cryptoPanel:       { left: 30,  top: 120, width: 360, height: 400 },
-      stockPanel:        { left: 420, top: 120, width: 360, height: 300 },
-      chartCryptoPanel:  { left: 800, top: 120, width: 400, height: 320 },
-      chartStocksPanel:  { left: 30,  top: 560, width: 400, height: 320 },
-      chartCombinedPanel:{ left: 450, top: 420, width: 400, height: 300 }
-    };
-
-    function loadPanelLayouts() {
-      const stored = localStorage.getItem('panelLayouts');
-      if (stored) {
-        try {
-          const obj = JSON.parse(stored);
-          for (let key in obj) {
-            if (panelLayouts[key]) {
-              panelLayouts[key] = { ...panelLayouts[key], ...obj[key] };
-            } else {
-              panelLayouts[key] = obj[key];
-            }
-          }
-        } catch(e) { console.error("解析面板布局失败:", e); }
-      }
-    }
-
-    function applyPanelLayouts() {
-      for (let panelId in panelLayouts) {
-        const layout = panelLayouts[panelId];
-        const el = document.getElementById(panelId);
-        if (el && layout) {
-          el.style.left   = layout.left + "px";
-          el.style.top    = layout.top + "px";
-          el.style.width  = layout.width + "px";
-          el.style.height = layout.height+ "px";
-        }
-      }
-    }
-
-    function savePanelLayouts() {
-      localStorage.setItem('panelLayouts', JSON.stringify(panelLayouts));
-    }
-
-    /***************************************************
-     *  B. 使用 Interact.js 初始化每个面板可拖拽 & 缩放
-     ***************************************************/
-    function initPanels() {
-      // 遍历 5 个面板
-      for (let panelId in panelLayouts) {
-        const layout = panelLayouts[panelId];
-        const el = document.getElementById(panelId);
-        if (!el) continue;
-
-        // 初始化 Interact.js
-        interact(el)
-          // 1) 拖拽
-          .draggable({
-            // 只有标题栏可拖拽
-            // 需一个可点击的选择器(Interact.js不支持像 .draggable({handle})的API)
-            // 所以这里用 listeners+ignoreFrom
-            ignoreFrom: 'input, table, .chart-container',  // 避免拖拽时点到面板内容
-            listeners: {
-              move(event) {
-                // 计算新的 left/top
-                const target = event.target;
-                // 先从 style 获取原来的 left/top
-                const leftOld = parseFloat(target.style.left) || 0;
-                const topOld  = parseFloat(target.style.top)  || 0;
-                // 累加移动量
-                const leftNew = leftOld + event.dx;
-                const topNew  = topOld  + event.dy;
-                // 应用
-                target.style.left = leftNew + "px";
-                target.style.top  = topNew  + "px";
-              },
-              end(event) {
-                // 拖拽结束后，保存位置到 localStorage
-                const target = event.target;
-                const leftF = parseFloat(target.style.left) || 0;
-                const topF  = parseFloat(target.style.top)  || 0;
-                panelLayouts[panelId].left = leftF;
-                panelLayouts[panelId].top  = topF;
-                savePanelLayouts();
-              }
-            }
-          })
-          // 2) 缩放
-          .resizable({
-            edges: { 
-              top: false,       // 不支持顶部缩放
-              left: false,      // 不支持左侧缩放
-              bottom: true,     // 支持底部
-              right: true       // 支持右侧
-            },
-            listeners: {
-              move(event) {
-                const target = event.target;
-                // 原先宽高
-                const wOld = parseFloat(target.style.width)  || layout.width;
-                const hOld = parseFloat(target.style.height) || layout.height;
-                // 累加 deltaRect
-                const wNew = wOld + event.deltaRect.width;
-                const hNew = hOld + event.deltaRect.height;
-                // 应用
-                target.style.width  = wNew + "px";
-                target.style.height = hNew + "px";
-              },
-              end(event) {
-                // 缩放结束后，保存尺寸到 localStorage
-                const target = event.target;
-                const wF = parseFloat(target.style.width)  || layout.width;
-                const hF = parseFloat(target.style.height) || layout.height;
-                panelLayouts[panelId].width  = wF;
-                panelLayouts[panelId].height = hF;
-                savePanelLayouts();
-              }
-            }
-          });
-      }
-    }
-
-    /***************************************************
-     * C. 业务逻辑：持仓 & 价格 & WebSocket
+     * 全局变量及 localStorage 处理
      ***************************************************/
     let cryptoPrices = { btc: 0, eth: 0, sui: 0, ena: 0 };
     let cryptoQty    = { btc: 0, eth: 0, sui: 0, ena: 0 };
     let stockPrices  = { tsla: 0, nvda: 0 };
     let stockQty     = { tsla: 0, nvda: 0 };
 
-    // 2小时保留
-    let cryptoHistory  = [];
-    let stockHistory   = [];
-    let combinedHistory= [];
+    // 定义保留历史的时间：2 小时（毫秒）
     const TWO_HOURS_MS = 2 * 3600 * 1000;
 
-    function loadDataFromStorage() {
-      // 读取持仓
+    // 持仓数据
+    function loadHoldings() {
       const sc = localStorage.getItem('myCryptoQty');
-      if (sc) { try { cryptoQty = { ...cryptoQty, ...JSON.parse(sc) }; } catch(e){} }
+      if (sc) {
+        try { cryptoQty = { ...cryptoQty, ...JSON.parse(sc) }; } catch(e) { console.error(e); }
+      }
       const ss = localStorage.getItem('myStockQty');
-      if (ss) { try { stockQty = { ...stockQty, ...JSON.parse(ss) }; } catch(e){} }
-
-      // 读取历史
-      const ch = localStorage.getItem('chartCryptoHistory');
-      if (ch) { try { cryptoHistory = JSON.parse(ch); } catch(e){} }
-      const sh = localStorage.getItem('chartStockHistory');
-      if (sh) { try { stockHistory = JSON.parse(sh); } catch(e){} }
-      const coh= localStorage.getItem('chartCombinedHistory');
-      if (coh){ try { combinedHistory = JSON.parse(coh); } catch(e){} }
-
-      // 只留最近2小时
-      const cutoff = Date.now() - TWO_HOURS_MS;
-      cryptoHistory   = cryptoHistory.filter(d => d.time >= cutoff);
-      stockHistory    = stockHistory.filter(d => d.time >= cutoff);
-      combinedHistory = combinedHistory.filter(d => d.time >= cutoff);
+      if (ss) {
+        try { stockQty = { ...stockQty, ...JSON.parse(ss) }; } catch(e) { console.error(e); }
+      }
     }
-
-    function saveChartHistory() {
-      localStorage.setItem('chartCryptoHistory',   JSON.stringify(cryptoHistory));
-      localStorage.setItem('chartStockHistory',    JSON.stringify(stockHistory));
-      localStorage.setItem('chartCombinedHistory', JSON.stringify(combinedHistory));
-    }
-
     function saveCrypto() {
       localStorage.setItem('myCryptoQty', JSON.stringify(cryptoQty));
     }
@@ -436,7 +288,7 @@
     }
 
     /***************************************************
-     * D. 更新输入框 & 表格
+     * 更新输入框和表格显示
      ***************************************************/
     function updateInputs() {
       document.getElementById('btcInput').value  = cryptoQty.btc || '';
@@ -453,57 +305,74 @@
       document.getElementById('ethQty').innerText = cryptoQty.eth;
       document.getElementById('suiQty').innerText = cryptoQty.sui;
       document.getElementById('enaQty').innerText = cryptoQty.ena;
-
       document.getElementById('btcPrice').innerText = cryptoPrices.btc ? cryptoPrices.btc.toFixed(2) : '--';
       document.getElementById('ethPrice').innerText = cryptoPrices.eth ? cryptoPrices.eth.toFixed(2) : '--';
       document.getElementById('suiPrice').innerText = cryptoPrices.sui ? cryptoPrices.sui.toFixed(2) : '--';
       document.getElementById('enaPrice').innerText = cryptoPrices.ena ? cryptoPrices.ena.toFixed(2) : '--';
 
-      const btcValue = cryptoPrices.btc * (cryptoQty.btc || 0);
-      const ethValue = cryptoPrices.eth * (cryptoQty.eth || 0);
-      const suiValue = cryptoPrices.sui * (cryptoQty.sui || 0);
-      const enaValue = cryptoPrices.ena * (cryptoQty.ena || 0);
-
+      const btcValue = (cryptoPrices.btc || 0) * (cryptoQty.btc || 0);
+      const ethValue = (cryptoPrices.eth || 0) * (cryptoQty.eth || 0);
+      const suiValue = (cryptoPrices.sui || 0) * (cryptoQty.sui || 0);
+      const enaValue = (cryptoPrices.ena || 0) * (cryptoQty.ena || 0);
       document.getElementById('btcValue').innerText = btcValue ? btcValue.toFixed(2) : '--';
       document.getElementById('ethValue').innerText = ethValue ? ethValue.toFixed(2) : '--';
       document.getElementById('suiValue').innerText = suiValue ? suiValue.toFixed(2) : '--';
       document.getElementById('enaValue').innerText = enaValue ? enaValue.toFixed(2) : '--';
-
       const cryptoTotal = btcValue + ethValue + suiValue + enaValue;
       document.getElementById('cryptoTotal').innerText = cryptoTotal ? cryptoTotal.toFixed(2) : '--';
 
       // 美股
       document.getElementById('tslaQty').innerText = stockQty.tsla;
       document.getElementById('nvdaQty').innerText = stockQty.nvda;
-
       document.getElementById('tslaPrice').innerText = stockPrices.tsla ? stockPrices.tsla.toFixed(2) : '--';
       document.getElementById('nvdaPrice').innerText = stockPrices.nvda ? stockPrices.nvda.toFixed(2) : '--';
-
-      const tslaValue = stockPrices.tsla * (stockQty.tsla || 0);
-      const nvdaValue = stockPrices.nvda * (stockQty.nvda || 0);
-
+      const tslaValue = (stockPrices.tsla || 0) * (stockQty.tsla || 0);
+      const nvdaValue = (stockPrices.nvda || 0) * (stockQty.nvda || 0);
       document.getElementById('tslaValue').innerText = tslaValue ? tslaValue.toFixed(2) : '--';
       document.getElementById('nvdaValue').innerText = nvdaValue ? nvdaValue.toFixed(2) : '--';
-
       const stockTotal = tslaValue + nvdaValue;
       document.getElementById('stockTotal').innerText = stockTotal ? stockTotal.toFixed(2) : '--';
 
-      // 如果要立即刷新图表，也可在此处理
       updateThreeCharts(cryptoTotal, stockTotal);
     }
 
+    function attachInputListeners() {
+      const ids = ['btcInput','ethInput','suiInput','enaInput','tslaInput','nvdaInput'];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', e => updateValue(e, id));
+          el.addEventListener('change', e => updateValue(e, id));
+        }
+      });
+    }
+
+    function updateValue(e, id) {
+      const val = parseFloat(e.target.value) || 0;
+      if (id === 'btcInput') cryptoQty.btc = val;
+      else if (id === 'ethInput') cryptoQty.eth = val;
+      else if (id === 'suiInput') cryptoQty.sui = val;
+      else if (id === 'enaInput') cryptoQty.ena = val;
+      else if (id === 'tslaInput') stockQty.tsla = val;
+      else if (id === 'nvdaInput') stockQty.nvda = val;
+      saveCrypto();
+      saveStocks();
+      updateDisplay();
+    }
+
+    function updateThreeCharts(cryptoTotal, stockTotal) {
+      // 此处仅留作扩展，目前图表数据主要由定时采样更新
+    }
+
     /***************************************************
-     * E. Binance WebSocket (BTC/ETH/SUI/ENA)
+     * G. Binance WebSocket (虚拟资产)
      ***************************************************/
     let cryptoWS;
     const wsReconnectMs = 5000;
-    const wsUrl = 
-      "wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/suiusdt@ticker/enausdt@ticker";
-
+    const wsUrl = "wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/suiusdt@ticker/enausdt@ticker";
     function connectBinanceWS() {
       cryptoWS = new WebSocket(wsUrl);
       document.getElementById('cryptoWsStatus').innerText = '币安WS：连接中...';
-
       cryptoWS.onopen = () => {
         document.getElementById('cryptoWsStatus').innerText = '币安WS：已连接';
       };
@@ -513,21 +382,14 @@
           const stream = raw.stream;
           const data = raw.data;
           const lastPrice = parseFloat(data.c);
-          if (stream.includes('btcusdt')) {
-            cryptoPrices.btc = lastPrice;
-          } else if (stream.includes('ethusdt')) {
-            cryptoPrices.eth = lastPrice;
-          } else if (stream.includes('suiusdt')) {
-            cryptoPrices.sui = lastPrice;
-          } else if (stream.includes('enausdt')) {
-            cryptoPrices.ena = lastPrice;
-          }
+          if (stream.includes('btcusdt')) cryptoPrices.btc = lastPrice;
+          else if (stream.includes('ethusdt')) cryptoPrices.eth = lastPrice;
+          else if (stream.includes('suiusdt')) cryptoPrices.sui = lastPrice;
+          else if (stream.includes('enausdt')) cryptoPrices.ena = lastPrice;
           updateDisplay();
         } catch(e) { console.error(e); }
       };
-      cryptoWS.onerror = err => {
-        console.error('Binance WS 错误：', err);
-      };
+      cryptoWS.onerror = err => { console.error('Binance WS 错误：', err); };
       cryptoWS.onclose = () => {
         document.getElementById('cryptoWsStatus').innerText = '币安WS：断开，重连中...';
         setTimeout(connectBinanceWS, wsReconnectMs);
@@ -535,23 +397,19 @@
     }
 
     /***************************************************
-     * F. Alpha Vantage REST API (TSLA/NVDA)
+     * H. Alpha Vantage (美股)
      ***************************************************/
-    const ALPHA_VANTAGE_KEY = 'demo'; // 替换为你自己的Key
+    const ALPHA_VANTAGE_KEY = "T4YWR3GJ1TSXFO3A";
     function fetchStockPrice(symbol) {
       const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
       return fetch(url)
         .then(res => res.json())
         .then(data => {
           const quote = data["Global Quote"];
-          if (quote && quote["05. price"]) {
-            return parseFloat(quote["05. price"]);
-          } else {
-            throw new Error("解析价格失败");
-          }
+          if (quote && quote["05. price"]) return parseFloat(quote["05. price"]);
+          else throw new Error("解析美股价格失败");
         });
     }
-
     function fetchStockPrices() {
       document.getElementById('stockStatus').innerText = '美股数据：请求中...';
       Promise.all([
@@ -567,17 +425,15 @@
         document.getElementById('stockStatus').innerText = '美股数据：请求失败';
       });
     }
-
     function startStockFetchLoop() {
       fetchStockPrices();
       setInterval(fetchStockPrices, 30000);
     }
 
     /***************************************************
-     * G. Chart.js & 2小时历史
+     * I. Chart.js & 2 小时历史数据
      ***************************************************/
     let cryptoChart, stockChart, combinedChart;
-
     let cryptoData = {
       labels: [],
       datasets: [{
@@ -611,6 +467,30 @@
         tension: 0.1
       }]
     };
+
+    // 历史数据数组
+    let cryptoHistory = [];
+    let stockHistory = [];
+    let combinedHistory = [];
+
+    function loadChartHistory() {
+      const cH = localStorage.getItem('chartCryptoHistory');
+      if (cH) { try { cryptoHistory = JSON.parse(cH); } catch(e) {} }
+      const sH = localStorage.getItem('chartStockHistory');
+      if (sH) { try { stockHistory = JSON.parse(sH); } catch(e) {} }
+      const cOH = localStorage.getItem('chartCombinedHistory');
+      if (cOH) { try { combinedHistory = JSON.parse(cOH); } catch(e) {} }
+      const cutoff = Date.now() - TWO_HOURS_MS;
+      cryptoHistory = cryptoHistory.filter(d => d.time >= cutoff);
+      stockHistory  = stockHistory.filter(d => d.time >= cutoff);
+      combinedHistory = combinedHistory.filter(d => d.time >= cutoff);
+    }
+
+    function saveChartHistory() {
+      localStorage.setItem('chartCryptoHistory', JSON.stringify(cryptoHistory));
+      localStorage.setItem('chartStockHistory', JSON.stringify(stockHistory));
+      localStorage.setItem('chartCombinedHistory', JSON.stringify(combinedHistory));
+    }
 
     function initCharts() {
       cryptoChart = new Chart(document.getElementById('chartCrypto').getContext('2d'), {
@@ -669,48 +549,42 @@
     function startChartUpdate() {
       setInterval(() => {
         const nowTime = Date.now();
-        const cutoff = nowTime - TWO_HOURS_MS;
-
-        const btcValue = cryptoPrices.btc * (cryptoQty.btc || 0);
-        const ethValue = cryptoPrices.eth * (cryptoQty.eth || 0);
-        const suiValue = cryptoPrices.sui * (cryptoQty.sui || 0);
-        const enaValue = cryptoPrices.ena * (cryptoQty.ena || 0);
+        const btcValue = (cryptoPrices.btc || 0) * (cryptoQty.btc || 0);
+        const ethValue = (cryptoPrices.eth || 0) * (cryptoQty.eth || 0);
+        const suiValue = (cryptoPrices.sui || 0) * (cryptoQty.sui || 0);
+        const enaValue = (cryptoPrices.ena || 0) * (cryptoQty.ena || 0);
         const cryptoTotal = btcValue + ethValue + suiValue + enaValue;
 
-        const tslaValue = stockPrices.tsla * (stockQty.tsla || 0);
-        const nvdaValue = stockPrices.nvda * (stockQty.nvda || 0);
+        const tslaValue = (stockPrices.tsla || 0) * (stockQty.tsla || 0);
+        const nvdaValue = (stockPrices.nvda || 0) * (stockQty.nvda || 0);
         const stockTotal = tslaValue + nvdaValue;
 
         const combinedTotal = cryptoTotal + stockTotal;
 
         pushDataPoint(cryptoHistory, nowTime, cryptoTotal, cryptoData, "chartCryptoLatest", "USDT");
         pushDataPoint(stockHistory, nowTime, stockTotal, stockData, "chartStocksLatest", "USD");
-        pushDataPoint(combinedHistory, nowTime, combinedTotal, combinedData, "chartCombinedLatest","USD");
+        pushDataPoint(combinedHistory, nowTime, combinedTotal, combinedData, "chartCombinedLatest", "USD");
 
         saveChartHistory();
       }, 5000);
     }
 
     function pushDataPoint(historyArr, timeStamp, value, chartData, latestValueElemId, unit) {
-      // 添加
       historyArr.push({ time: timeStamp, value });
-      // 过滤
-      while (historyArr.length && historyArr[0].time < timeStamp - TWO_HOURS_MS) {
+      const cutoff = timeStamp - TWO_HOURS_MS;
+      while (historyArr.length && historyArr[0].time < cutoff) {
         historyArr.shift();
       }
-      // 重建 chartData
       chartData.labels.length = 0;
       chartData.datasets[0].data.length = 0;
       for (let d of historyArr) {
         chartData.labels.push(formatTime(d.time));
         chartData.datasets[0].data.push(d.value);
       }
-      // 更新对应图表
-      if (chartData === cryptoData)      cryptoChart.update();
-      else if (chartData === stockData)  stockChart.update();
-      else                               combinedChart.update();
+      if (chartData === cryptoData) cryptoChart.update();
+      else if (chartData === stockData) stockChart.update();
+      else combinedChart.update();
 
-      // 更新「最新值」显示
       const latestEl = document.getElementById(latestValueElemId);
       if (latestEl) {
         latestEl.innerText = "最新: " + (value ? value.toFixed(2) : "--") + " " + unit;
@@ -726,35 +600,28 @@
      * H. 页面初始化
      ***************************************************/
     window.onload = function() {
-      // 1) 读取布局 & 应用
-      loadPanelLayouts();
-      applyPanelLayouts();
-      // 2) 初始化面板(Interact.js)
-      initPanels();
+      // 1) 加载持仓和图表历史数据
+      loadHoldings();
+      loadChartHistory();
 
-      // 3) 加载持仓 & 历史数据
-      loadDataFromStorage();
-
-      // 4) 初始化输入框 & 表格
+      // 2) 初始化输入框 & 表格
       updateInputs();
       attachInputListeners();
       updateDisplay();
 
-      // 5) 初始化图表 & 重建历史
+      // 3) 初始化图表 & 重建历史数据
       initCharts();
       rebuildChartFromHistory();
-
-      // 6) 开始每5秒采样
       startChartUpdate();
 
-      // 7) Binance WebSocket
+      // 4) 连接 Binance WebSocket
       if ("WebSocket" in window) {
         connectBinanceWS();
       } else {
         document.getElementById('cryptoWsStatus').innerText = '币安WS：不支持';
       }
 
-      // 8) 美股API轮询
+      // 5) 启动美股API轮询
       startStockFetchLoop();
     };
   </script>
