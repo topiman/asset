@@ -1,44 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Touch Punch Minimal Test</title>
-
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css">
-  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/TouchPunch/jquery.ui.touch-punch@0.2.3/jquery.ui.touch-punch.min.js"></script>
-
+  <meta charset="UTF-8">
+  <title>Interact.js Minimal Test</title>
+  <!-- 引入 Interact.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <style>
-    body {
-      margin: 0; 
-      padding: 0; 
-      position: relative;
+    html, body {
+      margin: 0; padding: 0; height: 100%;
       background: #f2f2f2;
     }
     #box {
-      width: 150px;
-      height: 150px;
-      background: #0d6efd;
-      border-radius: 4px;
-      color: #fff;
-      text-align: center;
+      width: 150px; 
+      height: 150px; 
+      background: #0d6efd; 
+      color: #fff; 
+      text-align: center; 
       line-height: 150px;
-      position: absolute;
+      position: absolute; 
       left: 30px; 
       top: 100px;
-      /* 避免阻碍触摸 */
-      overflow: visible;
+      user-select: none; /* 避免选中 */
     }
   </style>
 </head>
 <body>
-  <div id="box">拖我试试</div>
+  <div id="box">拖动我</div>
 
   <script>
-    $(function(){
-      $("#box").draggable();
-    });
+    // 用 Interact.js 实现可拖拽
+    interact('#box')
+      .draggable({
+        listeners: {
+          start (event) {
+            console.log('拖拽开始');
+          },
+          move (event) {
+            // 累加位移
+            const target = event.target;
+            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+            // 应用变换
+            target.style.transform = `translate(${x}px, ${y}px)`;
+            // 记住位置
+            target.setAttribute('data-x', x);
+            target.setAttribute('data-y', y);
+          },
+          end (event) {
+            console.log('拖拽结束');
+          }
+        }
+      });
   </script>
 </body>
 </html>
