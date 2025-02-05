@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>可拖拽 & 可缩放（支持Touch） - 布局持久化 + 2小时历史 + 显示最新值</title>
+  <title>可拖拽 & 可缩放（支持Touch） - 无容器限制 + 布局持久化 + 2小时历史</title>
 
   <!-- 1) jQuery UI CSS -->
   <link rel="stylesheet"
@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    /* ===================== 重置样式 ===================== */
+    /* ========= 重置默认样式 ========= */
     html, body {
       margin: 0;
       padding: 0;
@@ -44,7 +44,7 @@
       font-size: 24px;
     }
 
-    /* ===================== 面板样式 ===================== */
+    /* ========= 面板样式 ========= */
     .panel {
       background: #fff;
       border: 1px solid #ddd;
@@ -52,9 +52,8 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.2);
       padding: 16px;
       position: absolute;
-      /* 注释掉以下行，以免阻止触摸拖拽
-         overflow: hidden; */
-      overflow: visible; /* 改为 visible 或 auto 均可 */
+      /* 不要 overflow: hidden, 以免阻挡触摸 */
+      overflow: visible;
     }
     .panel:hover {
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
@@ -65,7 +64,7 @@
       font-size: 18px;
       color: #0d6efd;
       border-bottom: 1px solid #eee;
-      cursor: move; /* 拖拽手柄 */
+      cursor: move; /* 标题作为拖拽手柄 */
     }
 
     label {
@@ -110,7 +109,7 @@
       font-size: 14px;
     }
 
-    /* ===================== 图表容器 ===================== */
+    /* ========= 图表容器 ========= */
     .chart-latest-value {
       text-align: center;
       margin-bottom: 5px;
@@ -126,16 +125,22 @@
 
 <body>
   <header>
-    <h1>可拖拽 & 可缩放（支持Touch） - 布局持久化 + 2小时历史 + 显示最新值</h1>
+    <h1>可拖拽（全窗） & 可缩放 - 布局持久化 + 2小时历史</h1>
   </header>
 
-  <!-- 
-    以下是 5 个面板：虚拟资产、美股、3 张图表
-    每个面板可拖拽、可缩放，且布局保存到 localStorage
+  <!--
+    5 个面板： 
+      1. 虚拟资产
+      2. 美股资产
+      3. 虚拟资产图表
+      4. 美股图表
+      5. 总资产图表
+
+    关键：.draggable({ containment: "window" })，使其可在整个窗口自由拖拽
   -->
 
   <!-- (1) 虚拟资产 面板 -->
-  <div id="cryptoPanel" class="panel" 
+  <div id="cryptoPanel" class="panel"
        style="left: 30px; top: 120px; width: 360px; height: 400px;">
     <h3 class="panel-title">虚拟资产</h3>
     <form>
@@ -266,7 +271,6 @@
     </div>
   </div>
 
-
   <script>
     /***************************************************
      * A. 面板布局保存
@@ -303,7 +307,7 @@
           el.style.left   = layout.left + "px";
           el.style.top    = layout.top + "px";
           el.style.width  = layout.width + "px";
-          el.style.height = layout.height+ "px";
+          el.style.height = layout.height + "px";
         }
       }
     }
@@ -317,6 +321,8 @@
         const panelId = this.id;
         $(this).draggable({
           handle: ".panel-title",
+          // 关键：设置 containment: "window"，可在整个窗口拖拽
+          containment: "window",
           stop: function(event, ui) {
             panelLayouts[panelId].left = ui.position.left;
             panelLayouts[panelId].top  = ui.position.top;
@@ -348,26 +354,21 @@
     let combinedHistory= [];
 
     function loadDataFromStorage() {
+      // 持仓
       const sc = localStorage.getItem('myCryptoQty');
-      if (sc) {
-        try { cryptoQty = { ...cryptoQty, ...JSON.parse(sc) }; } catch(e) {}
-      }
+      if (sc) { try { cryptoQty = {...cryptoQty, ...JSON.parse(sc)};} catch(e){} }
       const ss = localStorage.getItem('myStockQty');
-      if (ss) {
-        try { stockQty = { ...stockQty, ...JSON.parse(ss) }; } catch(e) {}
-      }
+      if (ss) { try { stockQty = {...stockQty, ...JSON.parse(ss)};} catch(e){} }
+
+      // 历史数据
       const ch = localStorage.getItem('chartCryptoHistory');
-      if (ch) {
-        try { cryptoHistory = JSON.parse(ch); } catch(e) {}
-      }
+      if (ch) { try { cryptoHistory = JSON.parse(ch); } catch(e){} }
       const sh = localStorage.getItem('chartStockHistory');
-      if (sh) {
-        try { stockHistory = JSON.parse(sh); } catch(e) {}
-      }
-      const coh = localStorage.getItem('chartCombinedHistory');
-      if (coh){
-        try { combinedHistory = JSON.parse(coh); } catch(e) {}
-      }
+      if (sh) { try { stockHistory = JSON.parse(sh); } catch(e){} }
+      const coh= localStorage.getItem('chartCombinedHistory');
+      if (coh){ try { combinedHistory = JSON.parse(coh); } catch(e){} }
+
+      // 过滤只保留最近2小时
       const cutoff = Date.now() - TWO_HOURS_MS;
       cryptoHistory   = cryptoHistory.filter(d => d.time >= cutoff);
       stockHistory    = stockHistory.filter(d => d.time >= cutoff);
@@ -375,8 +376,8 @@
     }
 
     function saveChartHistory() {
-      localStorage.setItem('chartCryptoHistory', JSON.stringify(cryptoHistory));
-      localStorage.setItem('chartStockHistory', JSON.stringify(stockHistory));
+      localStorage.setItem('chartCryptoHistory',   JSON.stringify(cryptoHistory));
+      localStorage.setItem('chartStockHistory',    JSON.stringify(stockHistory));
       localStorage.setItem('chartCombinedHistory', JSON.stringify(combinedHistory));
     }
 
@@ -388,7 +389,7 @@
     }
 
     /***************************************************
-     * C. 更新表格 & 输入框
+     * C. 更新输入框 & 表格
      ***************************************************/
     function updateInputs() {
       document.getElementById('btcInput').value  = cryptoQty.btc || '';
@@ -440,11 +441,11 @@
       const stockTotal = tslaValue + nvdaValue;
       document.getElementById('stockTotal').innerText = stockTotal ? stockTotal.toFixed(2) : '--';
 
-      // 如果需要在这里实时更新图表，也可自行处理
       updateThreeCharts(cryptoTotal, stockTotal);
     }
 
     function attachInputListeners() {
+      // 虚拟资产
       document.getElementById('btcInput').addEventListener('input', e => {
         cryptoQty.btc = parseFloat(e.target.value) || 0;
         saveCrypto(); updateDisplay();
@@ -462,6 +463,7 @@
         saveCrypto(); updateDisplay();
       });
 
+      // 美股
       document.getElementById('tslaInput').addEventListener('input', e => {
         stockQty.tsla = parseFloat(e.target.value) || 0;
         saveStocks(); updateDisplay();
@@ -473,7 +475,7 @@
     }
 
     function updateThreeCharts(cryptoTotal, stockTotal) {
-      // 当前只在 setInterval 中每5秒采集图表数据
+      // 我们只在 setInterval 中每5秒插入图表数据
     }
 
     /***************************************************
@@ -487,14 +489,13 @@
     function connectBinanceWS() {
       cryptoWS = new WebSocket(wsUrl);
       document.getElementById('cryptoWsStatus').innerText = '币安WS：连接中...';
-
       cryptoWS.onopen = () => {
         document.getElementById('cryptoWsStatus').innerText = '币安WS：已连接';
       };
       cryptoWS.onmessage = event => {
         try {
           const raw = JSON.parse(event.data);
-          const stream = raw.stream;  
+          const stream = raw.stream;
           const data = raw.data;
           const lastPrice = parseFloat(data.c);
           if (stream.includes('btcusdt')) {
@@ -507,9 +508,7 @@
             cryptoPrices.ena = lastPrice;
           }
           updateDisplay();
-        } catch(e) {
-          console.error(e);
-        }
+        } catch(e) { console.error(e); }
       };
       cryptoWS.onerror = err => {
         console.error('Binance WS 错误：', err);
@@ -523,7 +522,7 @@
     /***************************************************
      * E. Alpha Vantage REST (TSLA/NVDA)
      ***************************************************/
-    const ALPHA_VANTAGE_KEY = 'demo';
+    const ALPHA_VANTAGE_KEY = 'demo'; // 替换为你自己的Key
     function fetchStockPrice(symbol) {
       const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`;
       return fetch(url)
@@ -692,10 +691,12 @@
         chartData.labels.push(formatTime(d.time));
         chartData.datasets[0].data.push(d.value);
       }
+      // 更新对应图表
       if (chartData === cryptoData)      cryptoChart.update();
       else if (chartData === stockData)  stockChart.update();
       else                               combinedChart.update();
 
+      // 更新「最新值」显示
       const latestEl = document.getElementById(latestValueElemId);
       if (latestEl) {
         latestEl.innerText = "最新: " + (value ? value.toFixed(2) : "--") + " " + unit;
@@ -724,14 +725,14 @@
       attachInputListeners();
       updateDisplay();
 
-      // 4) 初始化图表 & 重建历史曲线
+      // 4) 初始化图表 & 重建历史数据
       initCharts();
       rebuildChartFromHistory();
 
-      // 5) 每5秒采样一次
+      // 5) 开始每 5 秒采样一次
       startChartUpdate();
 
-      // 6) 启动Binance WS
+      // 6) 连接 Binance WS
       if ("WebSocket" in window) {
         connectBinanceWS();
       } else {
@@ -742,6 +743,5 @@
       startStockFetchLoop();
     };
   </script>
-
 </body>
 </html>
