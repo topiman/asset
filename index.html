@@ -2,14 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>v1 - 仅保留小时图表(总资产), 其它功能不变</title>
+  <title>v1 - 仅保留小时图表(总资产) + 每5秒更新「最新资产」+ 避免重复声明</title>
 
-  <!-- jQuery & Chart.js -->
+  <!-- jQuery & Chart.js (纯粹版) -->
   <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    /* ========== 布局 & 美化 ========== */
+    /* ======== 布局 & 美化 ======== */
     html,body {
       margin:0; padding:0; height:100%;
       background: linear-gradient(to bottom, #e3f2fd, #fff);
@@ -29,19 +29,16 @@
     }
     .col {
       background:#fff; border-radius:8px;
-      box-shadow:0 2px 5px rgba(0,0,0,.1);
+      box-shadow:0 2px 5px rgba(0,0,0,0.1);
       padding:16px; flex:1; min-width:280px;
     }
-    .col:hover {
-      box-shadow:0 5px 10px rgba(0,0,0,0.2);
-    }
+    .col:hover { box-shadow:0 5px 10px rgba(0,0,0,0.2); }
     .panel-title {
       margin:0 0 10px; padding-bottom:6px;
       font-size:20px; color:#1976d2;
       border-bottom:2px solid #eceff1;
     }
-    @media (max-width:767px){ .col{ flex:100%; } }
-
+    @media (max-width:767px){ .col { flex:100%; } }
     label {
       display:block; margin-bottom:5px; font-size:14px; color:#555;
     }
@@ -52,7 +49,7 @@
     table {
       width:100%; border-collapse:collapse; margin:10px 0;
     }
-    table, th, td { border:1px solid #ddd; }
+    table,th,td { border:1px solid #ddd; }
     th, td {
       padding:8px; text-align:center; font-size:14px;
     }
@@ -72,13 +69,13 @@
       width:100%; max-width:500px; margin:0 auto; height:300px;
     }
     @media (max-width:767px){
-      .chart-container { max-width:100%; height:220px; }
+      .chart-container{ max-width:100%; height:220px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>v1 - 仅保留小时图表(总资产)</h1>
+    <h1>v1 - 仅「小时图表」+每5秒更新最新值，无重复声明</h1>
   </header>
 
   <div class="container">
@@ -112,7 +109,8 @@
             </tr>
             <tr>
               <td>ENA</td><td id="enaPrice">--</td>
-              <td id="enaQty">--</td><td id="enaValue">--</td>
+              <td id="enaQty">--</td>
+              <td id="enaValue">--</td>
             </tr>
             <tr>
               <td colspan="3" class="total">虚拟货币合计</td>
@@ -153,7 +151,7 @@
       </div>
     </div>
 
-    <!-- 第二行：仅保留小时图表 (总资产) -->
+    <!-- 第二行：小时图表 (仅总资产) -->
     <div class="row">
       <div class="col">
         <h3 class="panel-title">总资产(小时/1年)</h3>
@@ -172,7 +170,7 @@
     const BINANCE_WS_URL= "wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/suiusdt@ticker/enausdt@ticker";
     const FINNHUB_TOKEN= "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
 
-    const MAX_HOUR_LEN= 8760; // 保留1年(24*365)
+    const MAX_HOUR_LEN= 8760; // 1年(24*365)
 
     // 持仓 & 价格
     let cryptoPrices= { btc:0, eth:0, sui:0, ena:0 };
@@ -180,21 +178,22 @@
     let stockPrices = { tsla:0, nvda:0 };
     let stockQty    = { tsla:0, nvda:0 };
 
-    // 小时曲线(仅总资产)
-    let hourlyComb= []; // { x:"YYYY-MM-DD HH:00", y: combinedTotal }
+    // 每小时曲线(总资产)
+    let hourlyComb= [];
 
-    let cryptoWS;  // Binance WS
-    let chartHourComb; // Chart.js 实例
+    // 全局唯一声明 WS & 图表
+    let cryptoWS;
+    let chartHourComb;
 
     /*************************************************************
      * B. localStorage
      *************************************************************/
     function loadLocal(){
       // 持仓
-      const sc= localStorage.getItem('myCryptoQty');
-      if(sc){ try{ cryptoQty={...cryptoQty, ...JSON.parse(sc)};} catch(e){} }
-      const ss= localStorage.getItem('myStockQty');
-      if(ss){ try{ stockQty={...stockQty, ...JSON.parse(ss)};} catch(e){} }
+      const cQ= localStorage.getItem('myCryptoQty');
+      if(cQ){ try{ cryptoQty={...cryptoQty,...JSON.parse(cQ)};}catch(e){} }
+      const sQ= localStorage.getItem('myStockQty');
+      if(sQ){ try{ stockQty={...stockQty,...JSON.parse(sQ)};}catch(e){} }
 
       // hourlyComb
       const hc= localStorage.getItem('hourlyComb');
@@ -228,12 +227,12 @@
       $('#nvdaInput').on('input', e=>{ stockQty.nvda= parseFloat(e.target.value)||0; saveLocalHoldings(); updateDisplay();});
     }
     function updateInputs(){
-      $('#btcInput').val( cryptoQty.btc||'' );
-      $('#ethInput').val( cryptoQty.eth||'' );
-      $('#suiInput').val( cryptoQty.sui||'' );
-      $('#enaInput').val( cryptoQty.ena||'' );
-      $('#tslaInput').val( stockQty.tsla||'' );
-      $('#nvdaInput').val( stockQty.nvda||'' );
+      $('#btcInput').val(cryptoQty.btc||'');
+      $('#ethInput').val(cryptoQty.eth||'');
+      $('#suiInput').val(cryptoQty.sui||'');
+      $('#enaInput').val(cryptoQty.ena||'');
+      $('#tslaInput').val(stockQty.tsla||'');
+      $('#nvdaInput').val(stockQty.nvda||'');
     }
     function updateDisplay(){
       // 虚拟货币
@@ -251,12 +250,12 @@
       const ethVal=(cryptoPrices.eth||0)*(cryptoQty.eth||0);
       const suiVal=(cryptoPrices.sui||0)*(cryptoQty.sui||0);
       const enaVal=(cryptoPrices.ena||0)*(cryptoQty.ena||0);
-      $('#btcValue').text( btcVal? btcVal.toFixed(2):'--');
-      $('#ethValue').text( ethVal? ethVal.toFixed(2):'--');
-      $('#suiValue').text( suiVal? suiVal.toFixed(2):'--');
-      $('#enaValue').text( enaVal? enaVal.toFixed(2):'--');
+      $('#btcValue').text(btcVal? btcVal.toFixed(2):'--');
+      $('#ethValue').text(ethVal? ethVal.toFixed(2):'--');
+      $('#suiValue').text(suiVal? suiVal.toFixed(2):'--');
+      $('#enaValue').text(enaVal? enaVal.toFixed(2):'--');
       const cryptoTotal= btcVal + ethVal + suiVal + enaVal;
-      $('#cryptoTotal').text( cryptoTotal? cryptoTotal.toFixed(2):'--' );
+      $('#cryptoTotal').text(cryptoTotal? cryptoTotal.toFixed(2):'--');
 
       // 美股
       $('#tslaQty').text(stockQty.tsla);
@@ -267,25 +266,25 @@
 
       const tslaVal=(stockPrices.tsla||0)*(stockQty.tsla||0);
       const nvdaVal=(stockPrices.nvda||0)*(stockQty.nvda||0);
-      $('#tslaValue').text( tslaVal? tslaVal.toFixed(2):'--');
-      $('#nvdaValue').text( nvdaVal? nvdaVal.toFixed(2):'--');
+      $('#tslaValue').text(tslaVal? tslaVal.toFixed(2):'--');
+      $('#nvdaValue').text(nvdaVal? nvdaVal.toFixed(2):'--');
       const stockTotal= tslaVal+ nvdaVal;
-      $('#stockTotal').text( stockTotal? stockTotal.toFixed(2):'--');
+      $('#stockTotal').text(stockTotal? stockTotal.toFixed(2):'--');
     }
 
     /*************************************************************
-     * D. Binance WebSocket (BTC/ETH/SUI/ENA)
+     * D. Binance WebSocket
      *************************************************************/
     function connectBinanceWS(){
       $('#cryptoWsStatus').text('BinanceWS: 连接中...');
-      cryptoWS= new WebSocket(BINANCE_WS_URL);
+      cryptoWS= new WebSocket(BINANCE_WS_URL); // <-- 使用全局 cryptoWS
       cryptoWS.onopen= ()=>{
         $('#cryptoWsStatus').text('BinanceWS: 已连接');
       };
       cryptoWS.onmessage= evt=>{
         try{
           const raw= JSON.parse(evt.data);
-          const {stream, data}= raw;
+          const {stream,data}= raw;
           const p= parseFloat(data.c);
           if(stream.includes('btcusdt')) cryptoPrices.btc= p;
           else if(stream.includes('ethusdt')) cryptoPrices.eth= p;
@@ -294,18 +293,18 @@
           updateDisplay();
         }catch(e){ console.error(e);}
       };
-      cryptoWS.onerror= err=> console.error('WS错误:', err);
+      cryptoWS.onerror= err=> console.error('BinanceWS错误:', err);
       cryptoWS.onclose= ()=>{
         $('#cryptoWsStatus').text('BinanceWS: 断开, 重连...');
-        setTimeout(connectBinanceWS,5000);
+        setTimeout(connectBinanceWS, 5000);
       };
     }
 
     /*************************************************************
-     * E. Finnhub 美股 (TSLA,NVDA)
+     * E. Finnhub 美股
      *************************************************************/
     async function fetchStockPrice(symbol){
-      const url= `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_TOKEN}`;
+      const url=`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_TOKEN}`;
       const res= await fetch(url);
       const js= await res.json();
       if(js && js.c) return parseFloat(js.c);
@@ -332,11 +331,23 @@
     }
 
     /*************************************************************
-     * F. 小时曲线(仅总资产)
+     * F. 小时图表(仅总资产)
      *************************************************************/
     function isHourlyBoundary(d=new Date()){
       const m= d.getMinutes(), s= d.getSeconds();
       return (m===0 && s<10);
+    }
+    function calcCryptoTotal(){
+      const b=(cryptoPrices.btc||0)*(cryptoQty.btc||0);
+      const e=(cryptoPrices.eth||0)*(cryptoQty.eth||0);
+      const s=(cryptoPrices.sui||0)*(cryptoQty.sui||0);
+      const a=(cryptoPrices.ena||0)*(cryptoQty.ena||0);
+      return b+ e+ s+ a;
+    }
+    function calcStockTotal(){
+      const t=(stockPrices.tsla||0)*(stockQty.tsla||0);
+      const n=(stockPrices.nvda||0)*(stockQty.nvda||0);
+      return t+ n;
     }
     function pushHourlyComb(value){
       // label => "YYYY-MM-DD HH:00"
@@ -354,23 +365,7 @@
     }
 
     /*************************************************************
-     * G. 计算总资产
-     *************************************************************/
-    function calcCryptoTotal(){
-      const b=(cryptoPrices.btc||0)*(cryptoQty.btc||0);
-      const e=(cryptoPrices.eth||0)*(cryptoQty.eth||0);
-      const s=(cryptoPrices.sui||0)*(cryptoQty.sui||0);
-      const a=(cryptoPrices.ena||0)*(cryptoQty.ena||0);
-      return b+ e+ s+ a;
-    }
-    function calcStockTotal(){
-      const t=(stockPrices.tsla||0)*(stockQty.tsla||0);
-      const n=(stockPrices.nvda||0)*(stockQty.nvda||0);
-      return t+ n;
-    }
-
-    /*************************************************************
-     * H. Chart.js (总资产(小时))
+     * G. Chart.js(小时)
      *************************************************************/
     const chartHourCombData={
       labels:[],
@@ -385,7 +380,6 @@
         }
       ]
     };
-
     function initChartHourComb(){
       chartHourComb= new Chart(document.getElementById('chartHourComb'), {
         type:'line',
@@ -419,29 +413,29 @@
     }
 
     /*************************************************************
-     * I. 每5秒检查 是否到小时 => pushHourlyComb
+     * H. 每5秒 => 显示最新总资产，若到小时 => push
      *************************************************************/
     function startHourSampling(){
       setInterval(()=>{
-        // 1) 更新显示(可能 Binance / Finnhub 有新价格)
+        // 1) 更新UI(若WS/Finnhub有新价格)
         updateDisplay();
 
-        // 2) 判断是否到小时 => 计算总资产 => pushHourlyComb
+        // 2) 计算最新总资产
+        const cVal= calcCryptoTotal();
+        const sVal= calcStockTotal();
+        const combVal= cVal+ sVal;
+
+        // 3) 每5秒更新 "最新: combVal"
+        document.getElementById('chartHourCombLatest').textContent
+          = "最新: " + combVal.toFixed(2) + " USD";
+
+        // 4) 若到小时 => pushHourlyComb
         if(isHourlyBoundary()){
-          const cVal= calcCryptoTotal();
-          const sVal= calcStockTotal();
-          const combVal= cVal+ sVal;
           pushHourlyComb(combVal);
         }
 
-        // 3) 重建小时图
+        // 5) 重建图
         rebuildChartHourComb();
-
-        // 4) 更新“最新值”
-        if(hourlyComb.length>0){
-          const latest= hourlyComb[hourlyComb.length-1].y;
-          $('#chartHourCombLatest').text("最新: "+ latest.toFixed(2)+" USD");
-        }
       }, 5000);
     }
 
@@ -452,22 +446,22 @@
       // 1) localStorage
       loadLocal();
 
-      // 2) 输入 & 显示
+      // 2) 初始化输入 & 显示
       updateInputs();
       attachInputListeners();
       updateDisplay();
 
-      // 3) 初始化 小时图
+      // 3) 初始化图表
       initChartHourComb();
       rebuildChartHourComb();
 
-      // 4) 每5秒检查小时 => push
+      // 4) 每5秒
       startHourSampling();
 
-      // 5) Binance
+      // 5) 连接 Binance
       connectBinanceWS();
 
-      // 6) 美股
+      // 6) 启动美股轮询
       startStockFetchLoop();
     };
   </script>
