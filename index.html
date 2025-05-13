@@ -376,6 +376,8 @@
       const DD = String(d.getDate()).padStart(2,'0');
       const hh = String(d.getHours()).padStart(2,'0');
       const label = `${yyyy}-${MM}-${DD} ${hh}:00`;
+      // 如果已存在相同 label，不进行 push
+      if (hourlyComb.some(item => item.x === label)) return;
       hourlyComb.push({ x: label, y: value });
       if(hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
       saveLocalHourlyComb();
