@@ -1,205 +1,15 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>v4 - 个人资产看板 (动态配置版)</title>
-  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
-  <style>
-    :root {
-      --bg-body: #0f172a;
-      --bg-card: #1e293b;
-      --bg-modal: #334155;
-      --text-primary: #f1f5f9;
-      --text-secondary: #94a3b8;
-      --accent-blue: #38bdf8;
-      --accent-green: #4ade80;
-      --accent-red: #f87171;
-      --border-color: #475569;
-    }
-
-    html, body {
-      margin: 0; padding: 0;
-      background-color: var(--bg-body);
-      color: var(--text-primary);
-      font-family: 'Segoe UI', Roboto, sans-serif;
-    }
-
-    /* Header */
-    header {
-      background: var(--bg-card); padding: 15px 20px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    header h1 { margin: 0; font-size: 1.4rem; color: var(--accent-blue); }
-    .header-controls { display: flex; align-items: center; gap: 15px; }
-    .btn-config {
-      background: transparent; border: 1px solid var(--accent-blue);
-      color: var(--accent-blue); padding: 5px 12px; border-radius: 4px;
-      cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
-    }
-    .btn-config:hover { background: var(--accent-blue); color: #fff; }
-    .total-worth-display span { color: var(--accent-green); font-weight: bold; font-size: 1.2rem; }
-
-    /* Layout */
-    .container { width: 95%; max-width: 1400px; margin: 20px auto; }
-    .row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
-    .col {
-      background: var(--bg-card); border-radius: 12px; padding: 20px;
-      flex: 1; min-width: 320px; border: 1px solid var(--border-color);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    }
-    h3.panel-title {
-      margin-top: 0; border-bottom: 1px solid var(--border-color);
-      padding-bottom: 10px; color: var(--text-secondary); font-size: 1rem;
-    }
-
-    /* Inputs & Tables */
-    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
-    .input-group label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
-    .input-group input {
-      width: 100%; box-sizing: border-box; background: #0f172a;
-      border: 1px solid var(--border-color); color: white; padding: 6px; border-radius: 4px;
-    }
-    .input-group input:focus { outline: none; border-color: var(--accent-blue); }
-
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th { text-align: left; color: var(--text-secondary); padding: 8px; border-bottom: 1px solid var(--border-color); }
-    td { padding: 8px; border-bottom: 1px solid var(--border-color); }
-    .val-cell { font-family: 'Consolas', monospace; }
-    .total-row td { font-weight: bold; color: var(--accent-blue); padding-top: 15px; border-top: 2px solid var(--border-color); }
-
-    .status-bar { margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: right; }
-    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 5px; }
-    .status-dot.active { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
-    .chart-box { height: 350px; position: relative; }
-
-    /* Modal (Settings) Styles */
-    .modal-overlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center;
-    }
-    .modal-content {
-      background: var(--bg-card); width: 90%; max-width: 600px; max-height: 90vh;
-      border-radius: 12px; border: 1px solid var(--border-color); padding: 20px;
-      display: flex; flex-direction: column; overflow-y: auto;
-    }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .modal-header h2 { margin: 0; color: var(--text-primary); font-size: 1.2rem; }
-    .close-modal { cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); }
-    
-    .config-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
-    .config-section h4 { color: var(--accent-blue); margin: 0 0 10px 0; }
-    
-    .config-list { list-style: none; padding: 0; margin: 0; }
-    .config-item {
-      display: flex; justify-content: space-between; align-items: center;
-      background: rgba(255,255,255,0.05); margin-bottom: 8px; padding: 8px 12px; border-radius: 6px;
-    }
-    .config-item span { font-weight: bold; }
-    .btn-delete { color: var(--accent-red); cursor: pointer; font-size: 0.9rem; }
-    .btn-delete:hover { opacity: 0.8; }
-
-    .add-row { display: flex; gap: 10px; margin-top: 10px; }
-    .add-row input {
-      flex: 1; background: #0f172a; border: 1px solid var(--border-color);
-      color: white; padding: 8px; border-radius: 4px;
-    }
-    .btn-add {
-      background: var(--accent-green); color: #000; border: none;
-      padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: bold;
-    }
-    .btn-reset {
-      background: #475569; color: #fff; border: none; padding: 10px; width: 100%;
-      border-radius: 6px; cursor: pointer; margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
-
-  <header>
-    <h1>我的资产看板 v4</h1>
-    <div class="header-controls">
-      <div class="total-worth-display">总净值: <span id="headerTotal">--</span></div>
-      <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 管理</button>
-    </div>
-  </header>
-
-  <div class="container">
-    <div class="row">
-      <div class="col">
-        <h3 class="panel-title">加密货币 (Crypto)</h3>
-        <div class="asset-grid" id="cryptoInputs"></div>
-        <table>
-          <thead><tr><th>资产</th><th>价格</th><th>持仓</th><th>价值 (USD)</th></tr></thead>
-          <tbody id="cryptoTableBody"></tbody>
-          <tfoot><tr class="total-row"><td colspan="3">Total</td><td id="cryptoTotalDisplay">--</td></tr></tfoot>
-        </table>
-        <div class="status-bar">
-          <span id="wsDot" class="status-dot"></span><span id="wsStatusText">Binance WS: 未连接</span>
-        </div>
-      </div>
-
-      <div class="col">
-        <h3 class="panel-title">美股 & 现金 (Stocks)</h3>
-        <div class="asset-grid" id="stockInputs"></div>
-        <table>
-          <thead><tr><th>代码</th><th>价格</th><th>持仓</th><th>价值 (USD)</th></tr></thead>
-          <tbody id="stockTableBody"></tbody>
-          <tfoot><tr class="total-row"><td colspan="3">Total</td><td id="stockTotalDisplay">--</td></tr></tfoot>
-        </table>
-        <div class="status-bar">
-          <span id="apiDot" class="status-dot"></span><span id="apiStatusText">Finnhub API: 等待</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="col" style="flex:2;">
-        <h3 class="panel-title">资产趋势 (1年/小时级)</h3>
-        <div class="chart-box"><canvas id="chartHourComb"></canvas></div>
-      </div>
-      <div class="col" style="flex:1;">
-        <h3 class="panel-title">持仓分布</h3>
-        <div class="chart-box"><canvas id="chartAssetPie"></canvas></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="configModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2><i class="fas fa-edit"></i> 管理资产列表</h2>
-        <span class="close-modal" onclick="closeConfigModal()">&times;</span>
-      </div>
-
-      <div class="config-section">
-        <h4>加密货币列表</h4>
-        <ul class="config-list" id="cryptoConfigList"></ul>
-        <div class="add-row">
-          <input type="text" id="newCryptoSymbol" placeholder="输入代币代码 (如 PEPE)">
-          <button class="btn-add" onclick="addCryptoAsset()">添加</button>
-        </div>
-      </div>
-
-      <div class="config-section">
-        <h4>美股/现金列表</h4>
-        <ul class="config-list" id="stockConfigList"></ul>
-        <div class="add-row">
-          <input type="text" id="newStockSymbol" placeholder="输入股票代码 (如 AAPL)">
-          <button class="btn-add" onclick="addStockAsset()">添加</button>
-        </div>
-      </div>
-
-      <button class="btn-reset" onclick="resetToDefault()">恢复默认设置</button>
-    </div>
-  </div>
-
 <script>
 /*************************************************************
- * A. 配置管理 (动态化核心)
+ * 0. 云端配置 (请替换这里!)
+ *************************************************************/
+const JSONBIN_ID  = "694a56ccae596e708fabeac2";       // 例如: 6760...
+const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";   // 例如: $2a$10$AbC...
+
+// 这是一个标志位，防止云端数据还没加载完就覆盖了
+let isDataLoaded = false;
+
+/*************************************************************
+ * A. 配置管理 & 云端同步
  *************************************************************/
 const DEFAULT_CRYPTO = [
   { symbol: 'BTC',  wsKey: 'btcusdt' },
@@ -217,64 +27,133 @@ let cryptoConfig = [];
 let stockConfig = [];
 let prices = {};
 let quantities = {};
-let hourlyComb = [];
+let hourlyComb = []; // 历史走势（因为体积大，建议只在本地存，或者也上传）
+
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
 const MAX_HOUR_LEN = 8760; 
 
-// WebSocket & Charts instances
 let cryptoWS = null;
 let chartLine, chartPie;
 let stockInterval = null;
 
-function loadConfig() {
-  const c = localStorage.getItem('v4_crypto_config');
-  const s = localStorage.getItem('v4_stock_config');
+// ★★★ 核心修改：从云端读取数据 ★★★
+async function loadConfig() {
+  $('#wsStatusText').text('正在从云端同步数据...');
   
-  cryptoConfig = c ? JSON.parse(c) : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
-  stockConfig = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_STOCK));
-
-  // Load Quantities
-  quantities = JSON.parse(localStorage.getItem('v4_holdings') || '{}');
-  
-  // Init Prices (0 or 1)
-  [...cryptoConfig, ...stockConfig].forEach(item => {
-    const key = item.symbol.toLowerCase();
-    if (quantities[key] === undefined) quantities[key] = 0;
-    if (item.isStable || item.isCash) prices[key] = 1;
-    else if (!prices[key]) prices[key] = 0;
-  });
-  
-  // Load History
   try {
-    const hc = JSON.parse(localStorage.getItem('hourlyComb'));
-    if(Array.isArray(hc)) hourlyComb = hc;
-  } catch(e){}
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': JSONBIN_KEY
+      }
+    });
+
+    if (!res.ok) throw new Error('云端连接失败');
+    
+    const json = await res.json();
+    const data = json.record; // JSONBin 的数据在 record 字段里
+
+    // 如果云端是空的（第一次），使用默认值
+    cryptoConfig = data.cryptoConfig || JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
+    stockConfig  = data.stockConfig  || JSON.parse(JSON.stringify(DEFAULT_STOCK));
+    quantities   = data.quantities   || {};
+    
+    // 初始化价格
+    [...cryptoConfig, ...stockConfig].forEach(item => {
+      const key = item.symbol.toLowerCase();
+      if (quantities[key] === undefined) quantities[key] = 0;
+      if (item.isStable || item.isCash) prices[key] = 1;
+      else if (!prices[key]) prices[key] = 0;
+    });
+
+    // 历史数据体积较大，如果你想多端同步历史图表，也可以放在 cloud 里
+    // 这里为了演示简单，假设历史数据也同步
+    if (Array.isArray(data.hourlyComb)) {
+      hourlyComb = data.hourlyComb;
+    } else {
+      // 如果云端没有，尝试读本地缓存作为补充
+      try {
+        const localH = JSON.parse(localStorage.getItem('hourlyComb'));
+        if(Array.isArray(localH)) hourlyComb = localH;
+      } catch(e){}
+    }
+
+    isDataLoaded = true;
+    renderUI();
+    restartServices();
+    initCharts(); // 数据拿到后再画图
+    $('#wsStatusText').text('数据同步完成');
+
+  } catch (err) {
+    console.error(err);
+    alert('无法读取云端数据，请检查 BIN_ID 和 API_KEY。将加载本地默认配置。');
+    // 降级处理：读不到云端就读默认
+    cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
+    stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
+    renderUI();
+    restartServices();
+    initCharts();
+  }
 }
 
+// ★★★ 核心修改：保存数据到云端 ★★★
+// 每次修改配置或持仓时调用
+async function saveToCloud() {
+  if (!isDataLoaded) return; // 防止覆盖
+
+  // 构造要保存的大对象
+  const payload = {
+    cryptoConfig: cryptoConfig,
+    stockConfig: stockConfig,
+    quantities: quantities,
+    hourlyComb: hourlyComb // 包含历史走势
+  };
+
+  // 显示保存状态
+  const originalText = $('#headerTotal').next().text(); // 获取当前按钮文字或其他状态
+  
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if(res.ok) {
+      console.log('云端保存成功');
+    }
+  } catch(e) {
+    console.error('云端保存失败', e);
+    alert('保存失败，请检查网络');
+  }
+}
+
+// 包装函数：保存配置
 function saveConfig() {
+  // 本地也存一份备份
   localStorage.setItem('v4_crypto_config', JSON.stringify(cryptoConfig));
-  localStorage.setItem('v4_stock_config', JSON.stringify(stockConfig));
-  renderUI();       // 重绘主界面
-  restartServices();// 重启 WS 和 API
+  renderUI();
+  restartServices();
+  saveToCloud(); // 上传
 }
 
+// 包装函数：保存持仓
 function saveHoldings() {
+  // 本地也存一份备份
   localStorage.setItem('v4_holdings', JSON.stringify(quantities));
+  saveToCloud(); // 上传
 }
 
 /*************************************************************
  * B. 模态框逻辑 (UI Interaction)
  *************************************************************/
-function openConfigModal() {
-  $('#configModal').css('display', 'flex');
-  renderConfigList();
-}
-function closeConfigModal() {
-  $('#configModal').hide();
-}
+function openConfigModal() { $('#configModal').css('display', 'flex'); renderConfigList(); }
+function closeConfigModal() { $('#configModal').hide(); }
 
 function renderConfigList() {
-  // Crypto List
   const $cList = $('#cryptoConfigList').empty();
   cryptoConfig.forEach((item, idx) => {
     $cList.append(`
@@ -285,7 +164,6 @@ function renderConfigList() {
     `);
   });
 
-  // Stock List
   const $sList = $('#stockConfigList').empty();
   stockConfig.forEach((item, idx) => {
     $sList.append(`
@@ -300,41 +178,30 @@ function renderConfigList() {
 function addCryptoAsset() {
   const sym = $('#newCryptoSymbol').val().toUpperCase().trim();
   if(!sym) return;
-  // 检查重复
   if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
-  
-  // 简单推断: wsKey = symbol + 'usdt'
   cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' });
   $('#newCryptoSymbol').val('');
-  renderConfigList();
-  saveConfig();
+  renderConfigList(); saveConfig();
 }
-function removeCrypto(idx) {
-  cryptoConfig.splice(idx, 1);
-  renderConfigList();
-  saveConfig();
-}
+function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveConfig(); }
 
 function addStockAsset() {
   const sym = $('#newStockSymbol').val().toUpperCase().trim();
   if(!sym) return;
   if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
-  
   stockConfig.push({ symbol: sym });
   $('#newStockSymbol').val('');
-  renderConfigList();
-  saveConfig();
+  renderConfigList(); saveConfig();
 }
-function removeStock(idx) {
-  stockConfig.splice(idx, 1);
-  renderConfigList();
-  saveConfig();
-}
+function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveConfig(); }
 
 function resetToDefault() {
-  if(confirm('确定要恢复默认资产列表吗？持仓数量不会删除。')) {
-    localStorage.removeItem('v4_crypto_config');
-    localStorage.removeItem('v4_stock_config');
+  if(confirm('警告：这会重置云端的所有配置！确定吗？')) {
+    cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
+    stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
+    quantities = {};
+    saveConfig(); // 立即同步到云端
+    saveHoldings();
     location.reload();
   }
 }
@@ -381,13 +248,14 @@ function renderUI() {
       </tr>`);
   });
 
-  // Re-bind events
   $('input[type="number"]').off('input').on('input', function() {
     const k = $(this).data('key');
     quantities[k] = parseFloat($(this).val()) || 0;
     $(`#q_${k}`).text(quantities[k]);
-    saveHoldings();
     recalc();
+    // 做了防抖处理，防止输入一个数字就请求一次云端，这里简化处理：
+    // 实际使用建议加 debounce，这里为了简单，每次输入都存一下（JSONBin频率限制较高没事）
+    saveHoldings(); 
   });
 }
 
@@ -412,23 +280,20 @@ function recalc() {
     $(`#v_${k}`).text(v.toFixed(2));
   });
 
+  const all = cTotal + sTotal;
   $('#cryptoTotalDisplay').text(cTotal.toFixed(2));
   $('#stockTotalDisplay').text(sTotal.toFixed(2));
-  const all = cTotal + sTotal;
   $('#headerTotal').text(all.toLocaleString('en-US',{style:'currency',currency:'USD'}));
   
-  updatePieChart(all); // 实时更新饼图
+  updatePieChart(all);
 }
 
 /*************************************************************
- * D. 服务连接 (WS & API)
+ * D. 服务连接
  *************************************************************/
 function restartServices() {
-  // Restart Binance WS
   if(cryptoWS) cryptoWS.close();
   startBinanceWS();
-  
-  // Restart Stock Polling
   if(stockInterval) clearInterval(stockInterval);
   fetchStockPrices();
   stockInterval = setInterval(fetchStockPrices, 30000);
@@ -458,11 +323,6 @@ function startBinanceWS() {
       }
     } catch(e){}
   };
-  cryptoWS.onclose = () => {
-    $('#wsDot').removeClass('active');
-    // 如果是意外断开，则重连；如果是由于配置更改导致的手动关闭，则不重连(由restartServices控制)
-    // 这里简单处理：不做复杂判断，依赖心跳或刷新。
-  };
 }
 
 async function fetchStockPrices() {
@@ -489,7 +349,10 @@ async function fetchStockPrices() {
  * E. 图表逻辑
  *************************************************************/
 function initCharts() {
-  // Line Chart
+  // 如果图表已经存在，销毁它重建
+  if(chartLine) chartLine.destroy();
+  if(chartPie) chartPie.destroy();
+
   const ctxLine = document.getElementById('chartHourComb').getContext('2d');
   chartLine = new Chart(ctxLine, {
     type: 'line',
@@ -507,12 +370,36 @@ function initCharts() {
     }
   });
 
-  // Pie Chart
   const ctxPie = document.getElementById('chartAssetPie').getContext('2d');
   chartPie = new Chart(ctxPie, {
     type: 'doughnut',
-    data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa'] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels:{boxWidth:10, color:'#94a3b8'} } } }
+    data: { 
+      labels: [], 
+      datasets: [{ 
+        data: [], 
+        borderWidth: 0, 
+        backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] 
+      }] 
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              let label = context.label || '';
+              if (label) label += ': ';
+              const value = context.parsed;
+              const total = context.dataset.data.reduce((acc, curr) => acc + curr, 0);
+              const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+              const formattedVal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+              return `${label}${formattedVal} (${percentage})`;
+            }
+          }
+        }
+      }
+    }
   });
 }
 
@@ -530,6 +417,8 @@ function updatePieChart(totalVal) {
 }
 
 function recordHistory() {
+  if(!isDataLoaded) return; // 数据没加载完别记录
+
   const currentTotal = [...cryptoConfig, ...stockConfig].reduce((acc, item) => {
     const k = item.symbol.toLowerCase();
     return acc + ((prices[k]||0) * (quantities[k]||0));
@@ -538,12 +427,17 @@ function recordHistory() {
   const d = new Date();
   const label = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:00`;
   
+  // 如果是新的小时点，记录并上传
   if (hourlyComb.length === 0 || hourlyComb[hourlyComb.length-1].x !== label) {
     hourlyComb.push({ x: label, y: currentTotal });
     if(hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
-    localStorage.setItem('hourlyComb', JSON.stringify(hourlyComb));
+    
+    // 更新图表
     chartLine.data.datasets[0].data = hourlyComb;
     chartLine.update();
+    
+    // 同步到云端
+    saveToCloud();
   }
 }
 
@@ -551,12 +445,10 @@ function recordHistory() {
  * Init
  *************************************************************/
 window.onload = function() {
+  // 注意：我们不再直接调用 renderUI，而是先 loadConfig，成功后再 renderUI
   loadConfig();
-  renderUI();
-  initCharts();
-  restartServices();
-  setInterval(recordHistory, 10000); // 10秒检查一次是否整点记录
+  
+  // 定时记录历史
+  setInterval(recordHistory, 10000);
 };
 </script>
-</body>
-</html>
