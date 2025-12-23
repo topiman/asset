@@ -2,11 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>v10 - 个人资产看板 (无限制历史记录版)</title>
+  <title>v11 - 个人资产看板 (智能压缩防爆版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-  <style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script> <style>
     :root {
       --bg-body: #0f172a; --bg-card: #1e293b; --bg-modal: #334155;
       --text-primary: #f1f5f9; --text-secondary: #94a3b8;
@@ -60,7 +59,7 @@
 <body>
 
   <header>
-    <h1>我的资产看板 v10</h1>
+    <h1>我的资产看板 v11</h1>
     <div class="header-controls">
       <div class="total-worth-display">总净值: <span id="headerTotal">--</span></div>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 管理配置</button>
@@ -92,7 +91,7 @@
     </div>
     <div class="row">
       <div class="col" style="flex:2;">
-        <h3 class="panel-title">资产趋势 (无限制)</h3>
+        <h3 class="panel-title">资产趋势 (智能压缩)</h3>
         <div class="chart-box"><canvas id="chartHourComb"></canvas></div>
       </div>
       <div class="col" style="flex:1;">
@@ -130,13 +129,14 @@
 
 <script>
 /*************************************************************
- * 1. 云端配置 (已填入正确 ID/Key)
+ * 1. 云端配置
  *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
 
-// 注意：移除了 MAX_HOUR_LEN 常量
+// 免费版限制 100KB, 我们留 5KB 余量 = 95KB
+const MAX_PAYLOAD_SIZE = 95 * 1024; 
 
 const DEFAULT_CRYPTO = [ { symbol: 'BTC', wsKey: 'btcusdt' }, { symbol: 'ETH', wsKey: 'ethusdt' }, { symbol: 'SOL', wsKey: 'solusdt' }, { symbol: 'USDT', wsKey: null, isStable: true } ];
 const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD', isCash: true } ];
@@ -147,7 +147,7 @@ let cryptoWS = null, chartLine, chartPie, stockInterval = null;
 const $el = (id) => document.getElementById(id);
 
 /*************************************************************
- * 2. 核心: 云端加载 + 历史迁移
+ * 2. 核心: 云端加载 (含解压逻辑)
  *************************************************************/
 async function loadConfig() {
   $el('wsStatusText').textContent = '连接云端...';
@@ -156,7 +156,6 @@ async function loadConfig() {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
       headers: { 'X-Master-Key': JSONBIN_KEY }
     });
-
     if (!res.ok) throw new Error("连接失败: " + res.status);
     
     const json = await res.json();
@@ -165,26 +164,37 @@ async function loadConfig() {
     cryptoConfig = (data.cryptoConfig && data.cryptoConfig.length > 0) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig  = (data.stockConfig && data.stockConfig.length > 0) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
     quantities   = data.quantities || {};
-    hourlyComb   = data.hourlyComb || [];
 
-    // V9/V10 历史数据迁移逻辑
+    // ★★★ 解压逻辑 ★★★
+    // 云端可能是 V10 的对象数组 [{x:..., y:...}]，也可能是 V11 的压缩数组 [[ts, val], ...]
+    let rawHistory = data.hourlyComb || [];
+    
+    // 如果是 V11 压缩格式 (数组的数组)，转回 Chart.js 需要的对象格式
+    if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) {
+      hourlyComb = rawHistory.map(item => ({
+        x: formatTs(item[0]), // 转换时间戳 -> 字符串
+        y: item[1]
+      }));
+    } else {
+      hourlyComb = rawHistory; // 旧格式直接用
+    }
+
+    // 本地迁移逻辑 (保留)
     if (!hourlyComb || hourlyComb.length < 2) {
       try {
         const localRaw = localStorage.getItem('hourlyComb');
         if (localRaw) {
           const localData = JSON.parse(localRaw);
           if (Array.isArray(localData) && localData.length > hourlyComb.length) {
-            console.log("检测到本地有历史数据，迁移并上传...");
+            console.log("检测到本地历史数据，迁移...");
             hourlyComb = localData; 
-            setTimeout(() => {
-              saveToCloud();
-              console.log("本地历史数据已自动上传。");
-            }, 3000);
+            setTimeout(saveToCloud, 3000); // 稍后自动保存(会触发压缩)
           }
         }
-      } catch(e) { console.error("本地历史迁移失败", e); }
+      } catch(e) {}
     }
 
+    // Init Prices
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
@@ -198,12 +208,14 @@ async function loadConfig() {
     initCharts(); 
     $el('wsStatusText').textContent = '云端同步正常';
     
+    // 如果是空的，初始化一下
     if (!data.cryptoConfig) saveToCloud();
 
   } catch (err) {
     console.error(err);
     $el('wsStatusText').textContent = '离线模式';
-    alert("读取云端失败: " + err.message + "\n将加载默认配置。");
+    alert("云端读取失败: " + err.message + "\n将使用离线/默认配置。");
+    // Fallback
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
     isDataLoaded = true;
@@ -213,21 +225,72 @@ async function loadConfig() {
   }
 }
 
+/*************************************************************
+ * 3. 核心: 云端保存 (含压缩与裁剪逻辑)
+ *************************************************************/
 async function saveToCloud() {
   if (!isDataLoaded) return;
-  const payload = { cryptoConfig, stockConfig, quantities, hourlyComb };
+
+  // ★★★ 压缩步骤 ★★★
+  // 把 [{x:'2023-12-23 10:00', y:1234.56}] 
+  // 变成 [[1703325600000, 1234]] (去掉了key，去掉了长字符串，取整)
+  const compressedHistory = hourlyComb.map(p => {
+    // 尝试解析日期字符串为时间戳
+    const ts = new Date(p.x).getTime();
+    // 如果解析失败(旧数据可能有问题)，就丢弃或保留原样(这里简化为当前时间)
+    return [!isNaN(ts) ? ts : Date.now(), Math.round(p.y)]; 
+  });
+
+  const payload = { 
+    cryptoConfig, 
+    stockConfig, 
+    quantities, 
+    hourlyComb: compressedHistory // 上传压缩版
+  };
+
+  // ★★★ 安全刹车: 检查大小 ★★★
+  let jsonString = JSON.stringify(payload);
+  let bytes = new Blob([jsonString]).size;
+  console.log(`当前数据大小: ${(bytes/1024).toFixed(2)} KB`);
+
+  // 如果超过限制，开始从头部(最旧的数据)删除，直到达标
+  if (bytes > MAX_PAYLOAD_SIZE) {
+    console.warn("数据超过 100KB 限制，正在裁剪旧数据...");
+    while (bytes > MAX_PAYLOAD_SIZE && payload.hourlyComb.length > 0) {
+      // 每次删掉 24 个点 (约一天的数据)，加快裁剪速度
+      payload.hourlyComb.splice(0, 24);
+      jsonString = JSON.stringify(payload);
+      bytes = new Blob([jsonString]).size;
+    }
+    // 同步回内存中的 hourlyComb，防止下次又超
+    // 注意：内存中需要保持对象格式，所以这里不动内存，只动上传数据
+    // 下次 loadConfig 时会加载裁剪后的数据
+    console.log(`裁剪完成，剩余大小: ${(bytes/1024).toFixed(2)} KB`);
+  }
+
   try {
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-      body: JSON.stringify(payload)
+      body: jsonString
     });
-    console.log('云端已保存');
+    if(!res.ok && res.status === 403) {
+      alert("警告：即便经过压缩，数据依然超过限制 (403)。建议重置数据。");
+    } else {
+      console.log('云端已保存');
+    }
   } catch(e) { console.error('保存失败', e); }
 }
 
+// 辅助: 时间戳转 'YYYY-MM-DD HH:00'
+function formatTs(ts) {
+  const d = new Date(ts);
+  const pad = n => n<10?'0'+n:n;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
+}
+
 /*************************************************************
- * 3. 界面渲染
+ * 4. 界面渲染
  *************************************************************/
 function renderUI() {
   const cIn = $el('cryptoInputs'); cIn.innerHTML = '';
@@ -282,7 +345,7 @@ function recalc() {
 }
 
 /*************************************************************
- * 4. 配置管理
+ * 5. 配置管理
  *************************************************************/
 function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
 function closeConfigModal() { $el('configModal').style.display = 'none'; }
@@ -311,17 +374,17 @@ function addStockAsset() {
 }
 function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
 function resetToDefault() {
-  if(confirm('确定要重置所有数据吗？这会清空你当前的持仓和列表。')) {
+  if(confirm('重置将清空所有数据，确定吗？')) {
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
-    quantities = {};
+    quantities = {}; hourlyComb = []; // 清空历史
     saveToCloud();
     location.reload();
   }
 }
 
 /*************************************************************
- * 5. 服务与图表
+ * 6. 服务与图表
  *************************************************************/
 function restartServices() {
   if(cryptoWS) cryptoWS.close();
@@ -382,14 +445,12 @@ function updatePieChart(total) {
   chartPie.data.labels = labels; chartPie.data.datasets[0].data = data; chartPie.update();
   
   const d = new Date();
-  const label = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:00`;
-  
-  // ★★★ V10 重点修改：移除长度检查 ★★★
-  // 原逻辑：if (hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
-  // 现逻辑：只 push，不 shift
+  const pad = n => n<10?'0'+n:n;
+  const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
   
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
     hourlyComb.push({ x: label, y: total });
+    // 注意：这里内存中不shift，让saveToCloud去处理裁剪
     chartLine.data.datasets[0].data = hourlyComb;
     chartLine.update();
     saveToCloud(); 
