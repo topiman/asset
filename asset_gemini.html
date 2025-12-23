@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>v3 - 个人资产看板 (Dark Mode)</title>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-body: #0f172a;
+      --bg-card: #1e293b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #4ade80;
+      --border-color: #334155;
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    header {
+      background: var(--bg-card);
+      padding: 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    header h1 { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--accent-blue); }
+    .total-worth-display { font-size: 1.2rem; font-weight: bold; }
+    .total-worth-display span { color: var(--accent-green); margin-left: 10px; font-size: 1.5rem; }
+
+    .container {
+      width: 95%; max-width: 1400px; margin: 20px auto;
+    }
+
+    .row {
+      display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;
+    }
+    
+    .col {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 20px;
+      flex: 1;
+      min-width: 320px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+    }
+
+    h3.panel-title {
+      margin-top: 0;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+      color: var(--text-secondary);
+      font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    /* 表单与表格样式优化 */
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .input-group label {
+      display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;
+    }
+    .input-group input {
+      width: 100%; box-sizing: border-box;
+      background: #0f172a; border: 1px solid var(--border-color);
+      color: white; padding: 8px; border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .input-group input:focus { outline: none; border-color: var(--accent-blue); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { text-align: left; color: var(--text-secondary); padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: normal; }
+    td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); }
+    tr:last-child td { border-bottom: none; }
+    .val-cell { font-family: 'Consolas', monospace; color: var(--text-primary); }
+    .total-row td { font-weight: bold; color: var(--accent-blue); padding-top: 15px; border-top: 2px solid var(--border-color); }
+
+    /* 状态指示器 */
+    .status-bar {
+      margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: right;
+    }
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #ef4444; margin-right: 5px;
+    }
+    .status-dot.active { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
+
+    /* 图表容器 */
+    .chart-box { height: 350px; position: relative; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>我的资产看板 v3</h1>
+    <div class="total-worth-display">
+      总净值: <span id="headerTotal">-- USD</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col">
+        <h3 class="panel-title">加密货币 (Crypto)</h3>
+        <div class="asset-grid" id="cryptoInputs"></div>
+        
+        <table>
+          <thead><tr><th>资产</th><th>价格</th><th>持仓</th><th>价值 (USD)</th></tr></thead>
+          <tbody id="cryptoTableBody"></tbody>
+          <tfoot>
+            <tr class="total-row"><td colspan="3">Crypto Total</td><td id="cryptoTotalDisplay">--</td></tr>
+          </tfoot>
+        </table>
+        <div class="status-bar">
+          <span id="wsDot" class="status-dot"></span><span id="wsStatusText">Binance WS: 连接中...</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="panel-title">美股 & 现金 (Stocks)</h3>
+        <div class="asset-grid" id="stockInputs"></div>
+        
+        <table>
+          <thead><tr><th>代码</th><th>价格</th><th>持仓</th><th>价值 (USD)</th></tr></thead>
+          <tbody id="stockTableBody"></tbody>
+          <tfoot>
+            <tr class="total-row"><td colspan="3">Stock Total</td><td id="stockTotalDisplay">--</td></tr>
+          </tfoot>
+        </table>
+        <div class="status-bar">
+          <span id="apiDot" class="status-dot"></span><span id="apiStatusText">Finnhub API: 等待更新</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col" style="flex:2;">
+        <h3 class="panel-title">资产趋势 (1 Year / Hourly)</h3>
+        <div class="chart-box">
+          <canvas id="chartHourComb"></canvas>
+        </div>
+      </div>
+      <div class="col" style="flex:1;">
+        <h3 class="panel-title">持仓分布</h3>
+        <div class="chart-box">
+          <canvas id="chartAssetPie"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*************************************************************
+ * 1. 核心配置 (在这里添加新币种)
+ *************************************************************/
+// Crypto: symbol用于显示，wsKey用于币安Websocket(必须小写+usdt), isStable表示固定1美元
+const CRYPTO_CONFIG = [
+  { symbol: 'BTC',  wsKey: 'btcusdt' },
+  { symbol: 'ETH',  wsKey: 'ethusdt' },
+  { symbol: 'SOL',  wsKey: 'solusdt' },
+  { symbol: 'SUI',  wsKey: 'suiusdt' },
+  { symbol: 'ENA',  wsKey: 'enausdt' },
+  { symbol: 'DOGE', wsKey: 'dogeusdt' }, // 新增
+  { symbol: 'XRP',  wsKey: 'xrpusdt' },  // 新增
+  { symbol: 'USDT', wsKey: null, isStable: true }
+];
+
+// Stocks: symbol用于Finnhub查询, isCash表示固定1美元
+const STOCK_CONFIG = [
+  { symbol: 'TSLA' },
+  { symbol: 'NVDA' }, // 新增
+  { symbol: 'MSTR' }, // 新增
+  { symbol: 'COIN' }, // 新增
+  { symbol: 'USD', isCash: true }
+];
+
+// API Config
+const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
+const MAX_HOUR_LEN = 8760; 
+
+// 状态管理
+let prices = {};    // 存储所有当前价格 { btc: 90000, tsla: 200 ... }
+let quantities = {};// 存储所有持仓数量 { btc: 1.5, tsla: 100 ... }
+let hourlyComb = []; // 历史数据
+let cryptoWS; 
+let chartLine, chartPie;
+
+/*************************************************************
+ * 2. 初始化与动态渲染 UI
+ *************************************************************/
+function initDataStore() {
+  // 从 LocalStorage 读取数量，或者初始化为0
+  const savedQty = JSON.parse(localStorage.getItem('v3_holdings') || '{}');
+  quantities = savedQty;
+
+  // 初始化价格默认为0 (稳定币/现金默认为1)
+  [...CRYPTO_CONFIG, ...STOCK_CONFIG].forEach(item => {
+    const key = item.symbol.toLowerCase();
+    if (!quantities[key]) quantities[key] = 0;
+    
+    if (item.isStable || item.isCash) prices[key] = 1;
+    else prices[key] = 0;
+  });
+
+  // 读取历史图表数据
+  try {
+    const hc = JSON.parse(localStorage.getItem('hourlyComb'));
+    if (Array.isArray(hc)) hourlyComb = hc;
+    if (hourlyComb.length > MAX_HOUR_LEN) hourlyComb = hourlyComb.slice(-MAX_HOUR_LEN);
+  } catch(e){}
+}
+
+function renderUI() {
+  // 渲染 Crypto 区域
+  const $cInput = $('#cryptoInputs');
+  const $cTable = $('#cryptoTableBody');
+  $cInput.empty(); $cTable.empty();
+
+  CRYPTO_CONFIG.forEach(c => {
+    const key = c.symbol.toLowerCase();
+    // Input
+    $cInput.append(`
+      <div class="input-group">
+        <label>${c.symbol}</label>
+        <input type="number" step="any" data-key="${key}" value="${quantities[key]}">
+      </div>
+    `);
+    // Table Row
+    $cTable.append(`
+      <tr>
+        <td><span style="font-weight:bold; color:var(--accent-blue)">${c.symbol}</span></td>
+        <td class="val-cell" id="price_${key}">--</td>
+        <td class="val-cell" id="qty_${key}">${quantities[key]}</td>
+        <td class="val-cell" id="val_${key}">--</td>
+      </tr>
+    `);
+  });
+
+  // 渲染 Stock 区域
+  const $sInput = $('#stockInputs');
+  const $sTable = $('#stockTableBody');
+  $sInput.empty(); $sTable.empty();
+
+  STOCK_CONFIG.forEach(s => {
+    const key = s.symbol.toLowerCase();
+    $sInput.append(`
+      <div class="input-group">
+        <label>${s.symbol}</label>
+        <input type="number" step="any" data-key="${key}" value="${quantities[key]}">
+      </div>
+    `);
+    $sTable.append(`
+      <tr>
+        <td><span style="font-weight:bold; color:var(--accent-green)">${s.symbol}</span></td>
+        <td class="val-cell" id="price_${key}">${s.isCash ? '1.00' : '--'}</td>
+        <td class="val-cell" id="qty_${key}">${quantities[key]}</td>
+        <td class="val-cell" id="val_${key}">--</td>
+      </tr>
+    `);
+  });
+
+  // 绑定输入事件
+  $('input[type="number"]').on('input', function() {
+    const key = $(this).data('key');
+    const val = parseFloat($(this).val()) || 0;
+    quantities[key] = val;
+    $(`#qty_${key}`).text(val);
+    saveHoldings();
+    recalcAll();
+  });
+}
+
+function saveHoldings() {
+  localStorage.setItem('v3_holdings', JSON.stringify(quantities));
+}
+
+/*************************************************************
+ * 3. 核心计算与显示更新
+ *************************************************************/
+function recalcAll() {
+  let cryptoTotal = 0;
+  let stockTotal = 0;
+
+  // 计算 Crypto
+  CRYPTO_CONFIG.forEach(c => {
+    const key = c.symbol.toLowerCase();
+    const p = prices[key] || 0;
+    const q = quantities[key] || 0;
+    const val = p * q;
+    cryptoTotal += val;
+
+    $(`#price_${key}`).text(p > 0 ? p.toFixed(p < 1 ? 4 : 2) : '--');
+    $(`#val_${key}`).text(val > 0 ? val.toFixed(2) : '--');
+  });
+
+  // 计算 Stocks
+  STOCK_CONFIG.forEach(s => {
+    const key = s.symbol.toLowerCase();
+    const p = prices[key] || 0;
+    const q = quantities[key] || 0;
+    const val = p * q;
+    stockTotal += val;
+
+    if (!s.isCash) {
+       $(`#price_${key}`).text(p > 0 ? p.toFixed(2) : '--');
+    }
+    $(`#val_${key}`).text(val > 0 ? val.toFixed(2) : '--');
+  });
+
+  // 更新总计
+  $('#cryptoTotalDisplay').text(cryptoTotal.toFixed(2));
+  $('#stockTotalDisplay').text(stockTotal.toFixed(2));
+  const grandTotal = cryptoTotal + stockTotal;
+  $('#headerTotal').text(grandTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
+}
+
+/*************************************************************
+ * 4. 数据源连接 (WebSocket & API)
+ *************************************************************/
+function startBinanceWS() {
+  const streams = CRYPTO_CONFIG
+    .filter(c => c.wsKey)
+    .map(c => c.wsKey + '@ticker')
+    .join('/');
+
+  if(!streams) return;
+
+  const url = "wss://stream.binance.com:9443/stream?streams=" + streams;
+  
+  $('#wsStatusText').text('连接中...');
+  $('#wsDot').removeClass('active');
+
+  cryptoWS = new WebSocket(url);
+  
+  cryptoWS.onopen = () => {
+    $('#wsStatusText').text('已连接 (Live)');
+    $('#wsDot').addClass('active');
+  };
+  
+  cryptoWS.onmessage = (evt) => {
+    try {
+      const msg = JSON.parse(evt.data);
+      const streamName = msg.stream; // e.g. btcusdt@ticker
+      const price = parseFloat(msg.data.c);
+      
+      // 找到对应的 symbol Key
+      const config = CRYPTO_CONFIG.find(c => c.wsKey && streamName.includes(c.wsKey));
+      if (config) {
+        prices[config.symbol.toLowerCase()] = price;
+        recalcAll(); // 每次价格变动都重算（性能足够）
+      }
+    } catch(e) {}
+  };
+
+  cryptoWS.onclose = () => {
+    $('#wsDot').removeClass('active');
+    $('#wsStatusText').text('断开，5秒后重连...');
+    setTimeout(startBinanceWS, 5000);
+  };
+}
+
+async function fetchStockPrices() {
+  $('#apiDot').removeClass('active');
+  $('#apiStatusText').text('更新中...');
+  
+  const symbols = STOCK_CONFIG.filter(s => !s.isCash).map(s => s.symbol);
+  
+  // 并行请求所有股票价格
+  const promises = symbols.map(sym => 
+    fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_TOKEN}`)
+      .then(res => res.json())
+      .then(data => ({ symbol: sym, price: data.c }))
+      .catch(e => null)
+  );
+
+  const results = await Promise.all(promises);
+  
+  results.forEach(res => {
+    if(res && res.price) {
+      prices[res.symbol.toLowerCase()] = parseFloat(res.price);
+    }
+  });
+
+  recalcAll();
+  $('#apiDot').addClass('active');
+  $('#apiStatusText').text('已更新 (' + new Date().toLocaleTimeString() + ')');
+}
+
+/*************************************************************
+ * 5. 图表逻辑 (Chart.js)
+ *************************************************************/
+function initCharts() {
+  Chart.defaults.color = '#94a3b8';
+  Chart.defaults.borderColor = '#334155';
+
+  // 1. Line Chart
+  const ctxLine = document.getElementById('chartHourComb').getContext('2d');
+  chartLine = new Chart(ctxLine, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: '总资产 (USD)',
+        data: hourlyComb,
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHitRadius: 10,
+        parsing: { xAxisKey: 'x', yAxisKey: 'y' }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false }, // 隐藏X轴标签，保持简洁
+        y: { position: 'right' }
+      }
+    }
+  });
+
+  // 2. Pie Chart
+  const ctxPie = document.getElementById('chartAssetPie').getContext('2d');
+  chartPie = new Chart(ctxPie, {
+    type: 'doughnut',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        backgroundColor: [
+          '#38bdf8', '#4ade80', '#fbbf24', '#f87171', '#a78bfa', '#2dd4bf', '#fb923c', '#94a3b8'
+        ],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 10 } }
+      }
+    }
+  });
+}
+
+function updateChartsData() {
+  // Update Pie Data
+  let pieLabels = [];
+  let pieData = [];
+  
+  // 合并所有资产列表
+  const allItems = [...CRYPTO_CONFIG, ...STOCK_CONFIG];
+  allItems.forEach(item => {
+    const key = item.symbol.toLowerCase();
+    const val = (prices[key] || 0) * (quantities[key] || 0);
+    if (val > 10) { // 忽略极小余额，避免饼图太乱
+      pieLabels.push(item.symbol);
+      pieData.push(val);
+    }
+  });
+
+  chartPie.data.labels = pieLabels;
+  chartPie.data.datasets[0].data = pieData;
+  chartPie.update();
+
+  // Record History Logic (每小时记录)
+  const total = pieData.reduce((a,b)=>a+b, 0);
+  const d = new Date();
+  const label = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:00`;
+  
+  // 如果当前小时还没有记录，或者列表为空，则推入
+  if (hourlyComb.length === 0 || hourlyComb[hourlyComb.length-1].x !== label) {
+    hourlyComb.push({ x: label, y: total });
+    if(hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
+    localStorage.setItem('hourlyComb', JSON.stringify(hourlyComb));
+    
+    chartLine.data.datasets[0].data = hourlyComb;
+    chartLine.update();
+  } else {
+    // 如果是当前小时，更新最后一个点的值（修正）
+    hourlyComb[hourlyComb.length-1].y = total;
+    chartLine.update('none'); // none模式避免动画闪烁
+  }
+}
+
+/*************************************************************
+ * 6. 启动
+ *************************************************************/
+window.onload = function() {
+  initDataStore();
+  renderUI();
+  recalcAll(); // 先用缓存或0值显示一遍
+  initCharts();
+  
+  startBinanceWS();
+  fetchStockPrices();
+  setInterval(fetchStockPrices, 30000); // 美股30秒轮询
+  
+  // 图表每5秒刷新一次（更新饼图和记录历史）
+  setInterval(updateChartsData, 5000);
+};
+</script>
+</body>
+</html>
