@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>v8 - 个人资产看板 (完整配置版)</title>
+  <title>v9 - 个人资产看板 (历史数据同步版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -15,7 +15,6 @@
     }
     body { margin: 0; background: var(--bg-body); color: var(--text-primary); font-family: 'Segoe UI', sans-serif; }
     
-    /* Header & Layout */
     header { background: var(--bg-card); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
     header h1 { margin: 0; font-size: 1.4rem; color: var(--accent-blue); }
     .header-controls { display: flex; align-items: center; gap: 15px; }
@@ -28,7 +27,6 @@
     .col { background: var(--bg-card); border-radius: 12px; padding: 20px; flex: 1; min-width: 320px; border: 1px solid var(--border-color); }
     h3.panel-title { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; color: var(--text-secondary); }
 
-    /* Tables & Inputs */
     .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
     .input-group label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
     .input-group input { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 6px; border-radius: 4px; }
@@ -37,25 +35,22 @@
     th { color: var(--text-secondary); }
     .val-cell { font-family: 'Consolas', monospace; }
     
-    /* Status & Modal */
     .status-bar { margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: right; }
     .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 5px; }
     .status-dot.active { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
     .chart-box { height: 350px; position: relative; }
 
-    /* Configuration Modal Styles */
+    /* Modal */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
     .modal-content { background: var(--bg-card); width: 90%; max-width: 500px; max-height: 85vh; border-radius: 12px; border: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .close-modal { cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); }
-    
     .config-section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
     .config-section h4 { color: var(--accent-blue); margin: 0 0 10px 0; }
     .config-list { list-style: none; padding: 0; margin: 0; }
     .config-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; }
     .btn-delete { color: var(--accent-red); cursor: pointer; transition: 0.2s; }
     .btn-delete:hover { transform: scale(1.2); }
-    
     .add-row { display: flex; gap: 10px; margin-top: 10px; }
     .add-row input { flex: 1; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 8px; border-radius: 4px; }
     .btn-add { background: var(--accent-green); color: #000; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -65,7 +60,7 @@
 <body>
 
   <header>
-    <h1>我的资产看板 v8</h1>
+    <h1>我的资产看板 v9</h1>
     <div class="header-controls">
       <div class="total-worth-display">总净值: <span id="headerTotal">--</span></div>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 管理配置</button>
@@ -113,7 +108,6 @@
         <h2><i class="fas fa-edit"></i> 管理资产列表</h2>
         <span class="close-modal" onclick="closeConfigModal()">&times;</span>
       </div>
-
       <div class="config-section">
         <h4>加密货币</h4>
         <ul class="config-list" id="cryptoConfigList"></ul>
@@ -122,7 +116,6 @@
           <button class="btn-add" onclick="addCryptoAsset()">添加</button>
         </div>
       </div>
-
       <div class="config-section">
         <h4>美股/现金</h4>
         <ul class="config-list" id="stockConfigList"></ul>
@@ -131,44 +124,29 @@
           <button class="btn-add" onclick="addStockAsset()">添加</button>
         </div>
       </div>
-
       <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
     </div>
   </div>
 
 <script>
 /*************************************************************
- * 1. 云端配置 (已填入你提供的正确信息)
+ * 1. 云端配置
  *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
-
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
 const MAX_HOUR_LEN = 8760;
 
-// 默认配置 (如果云端是空的，会用这个初始化)
-const DEFAULT_CRYPTO = [
-  { symbol: 'BTC',  wsKey: 'btcusdt' },
-  { symbol: 'ETH',  wsKey: 'ethusdt' },
-  { symbol: 'SOL',  wsKey: 'solusdt' },
-  { symbol: 'USDT', wsKey: null, isStable: true }
-];
-const DEFAULT_STOCK = [
-  { symbol: 'TSLA' },
-  { symbol: 'NVDA' },
-  { symbol: 'USD', isCash: true }
-];
+const DEFAULT_CRYPTO = [ { symbol: 'BTC', wsKey: 'btcusdt' }, { symbol: 'ETH', wsKey: 'ethusdt' }, { symbol: 'SOL', wsKey: 'solusdt' }, { symbol: 'USDT', wsKey: null, isStable: true } ];
+const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD', isCash: true } ];
 
-// 全局状态
 let isDataLoaded = false;
 let cryptoConfig = [], stockConfig = [], quantities = {}, prices = {}, hourlyComb = [];
 let cryptoWS = null, chartLine, chartPie, stockInterval = null;
-
-// 简易 DOM 选择器
 const $el = (id) => document.getElementById(id);
 
 /*************************************************************
- * 2. 核心: 云端加载与保存
+ * 2. 核心: 云端加载 + 历史迁移
  *************************************************************/
 async function loadConfig() {
   $el('wsStatusText').textContent = '连接云端...';
@@ -183,13 +161,33 @@ async function loadConfig() {
     const json = await res.json();
     const data = json.record; 
 
-    // 智能合并：如果云端没有 config (比如是空 Bin)，则使用 DEFAULT
     cryptoConfig = (data.cryptoConfig && data.cryptoConfig.length > 0) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig  = (data.stockConfig && data.stockConfig.length > 0) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
     quantities   = data.quantities || {};
     hourlyComb   = data.hourlyComb || [];
 
-    // 初始化价格字典
+    // ★★★ V9 核心升级：历史数据迁移 ★★★
+    // 逻辑：如果云端的历史数据是空的（或者很少），说明是第一次同步
+    // 我们就检查本地 LocalStorage 里有没有旧版留下的数据，如果有，就合并过来。
+    if (!hourlyComb || hourlyComb.length < 2) {
+      try {
+        const localRaw = localStorage.getItem('hourlyComb');
+        if (localRaw) {
+          const localData = JSON.parse(localRaw);
+          if (Array.isArray(localData) && localData.length > hourlyComb.length) {
+            console.log("检测到本地有更完整的历史数据，正在迁移...");
+            hourlyComb = localData; // 使用本地数据覆盖/填充
+            
+            // 稍后强制保存一次，这样数据就上云了
+            setTimeout(() => {
+              saveToCloud();
+              console.log("本地历史数据已自动上传云端。");
+            }, 3000);
+          }
+        }
+      } catch(e) { console.error("本地历史迁移失败", e); }
+    }
+
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
@@ -202,17 +200,14 @@ async function loadConfig() {
     restartServices();
     initCharts(); 
     $el('wsStatusText').textContent = '云端同步正常';
-
-    // 如果是用默认值初始化的，顺手保存回云端，防止下次读到空的
-    if (!data.cryptoConfig) {
-      saveToCloud();
-    }
+    
+    // 如果是初始空数据，保存一次以初始化结构
+    if (!data.cryptoConfig) saveToCloud();
 
   } catch (err) {
     console.error(err);
     $el('wsStatusText').textContent = '离线模式';
     alert("读取云端失败: " + err.message + "\n将加载默认配置。");
-    // 降级
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
     isDataLoaded = true;
@@ -224,6 +219,7 @@ async function loadConfig() {
 
 async function saveToCloud() {
   if (!isDataLoaded) return;
+  // 这里把 hourlyComb 也放进 payload，实现了历史趋势上云
   const payload = { cryptoConfig, stockConfig, quantities, hourlyComb };
   try {
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
@@ -239,7 +235,6 @@ async function saveToCloud() {
  * 3. 界面渲染
  *************************************************************/
 function renderUI() {
-  // Render Crypto
   const cIn = $el('cryptoInputs'); cIn.innerHTML = '';
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
@@ -248,7 +243,6 @@ function renderUI() {
     cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
   });
 
-  // Render Stocks
   const sIn = $el('stockInputs'); sIn.innerHTML = '';
   const sTb = $el('stockTableBody'); sTb.innerHTML = '';
   stockConfig.forEach(s => {
@@ -257,7 +251,6 @@ function renderUI() {
     sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
   });
 
-  // Re-bind Events
   document.querySelectorAll('input[type="number"]').forEach(el => {
     el.oninput = function() {
       const k = this.getAttribute('data-key');
@@ -272,94 +265,56 @@ function renderUI() {
 
 function recalc() {
   let cTotal = 0, sTotal = 0;
-  
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
-    const v = p*q;
-    cTotal += v;
+    const v = p*q; cTotal += v;
     if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
   });
-
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
-    const v = p*q;
-    sTotal += v;
+    const v = p*q; sTotal += v;
     if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
   });
-
   const all = cTotal + sTotal;
   $el('cryptoTotalDisplay').textContent = cTotal.toFixed(2);
   $el('stockTotalDisplay').textContent = sTotal.toFixed(2);
   $el('headerTotal').textContent = all.toLocaleString('en-US',{style:'currency',currency:'USD'});
-  
   updatePieChart(all);
 }
 
 /*************************************************************
- * 4. 配置管理 (Modal Logic Restored)
+ * 4. 配置管理
  *************************************************************/
-function openConfigModal() { 
-  $el('configModal').style.display = 'flex'; 
-  renderConfigList(); 
-}
-function closeConfigModal() { 
-  $el('configModal').style.display = 'none'; 
-}
-
+function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
+function closeConfigModal() { $el('configModal').style.display = 'none'; }
 function renderConfigList() {
   const cList = $el('cryptoConfigList'); cList.innerHTML = '';
   cryptoConfig.forEach((item, idx) => {
-    cList.insertAdjacentHTML('beforeend', `
-      <li class="config-item">
-        <span>${item.symbol}</span>
-        ${item.symbol!=='USDT' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeCrypto(${idx})"></i>` : ''}
-      </li>
-    `);
+    cList.insertAdjacentHTML('beforeend', `<li class="config-item"><span>${item.symbol}</span>${item.symbol!=='USDT' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeCrypto(${idx})"></i>` : ''}</li>`);
   });
-
   const sList = $el('stockConfigList'); sList.innerHTML = '';
   stockConfig.forEach((item, idx) => {
-    sList.insertAdjacentHTML('beforeend', `
-      <li class="config-item">
-        <span>${item.symbol}</span>
-        ${item.symbol!=='USD' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeStock(${idx})"></i>` : ''}
-      </li>
-    `);
+    sList.insertAdjacentHTML('beforeend', `<li class="config-item"><span>${item.symbol}</span>${item.symbol!=='USD' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeStock(${idx})"></i>` : ''}</li>`);
   });
 }
-
 function addCryptoAsset() {
-  const input = $el('newCryptoSymbol');
-  const sym = input.value.toUpperCase().trim();
-  if(!sym) return;
-  if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
+  const input = $el('newCryptoSymbol'); const sym = input.value.toUpperCase().trim();
+  if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
   cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' });
-  input.value = '';
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  input.value = ''; renderConfigList(); saveToCloud(); renderUI(); restartServices();
 }
-function removeCrypto(idx) { 
-  cryptoConfig.splice(idx, 1); 
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
-}
-
+function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
 function addStockAsset() {
-  const input = $el('newStockSymbol');
-  const sym = input.value.toUpperCase().trim();
-  if(!sym) return;
-  if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
+  const input = $el('newStockSymbol'); const sym = input.value.toUpperCase().trim();
+  if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
   stockConfig.push({ symbol: sym });
-  input.value = '';
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  input.value = ''; renderConfigList(); saveToCloud(); renderUI(); restartServices();
 }
-function removeStock(idx) { 
-  stockConfig.splice(idx, 1); 
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
-}
-
+function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
 function resetToDefault() {
   if(confirm('确定要重置所有数据吗？这会清空你当前的持仓和列表。')) {
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
@@ -388,12 +343,10 @@ function restartServices() {
       } catch(e){}
     };
   }
-
   if(stockInterval) clearInterval(stockInterval);
   fetchStocks();
   stockInterval = setInterval(fetchStocks, 30000);
 }
-
 async function fetchStocks() {
   $el('apiDot').classList.remove('active');
   const symbols = stockConfig.filter(s => !s.isCash).map(s => s.symbol);
@@ -407,13 +360,11 @@ async function fetchStocks() {
 function initCharts() {
   if(chartLine) chartLine.destroy();
   if(chartPie) chartPie.destroy();
-
   chartLine = new Chart($el('chartHourComb').getContext('2d'), {
     type: 'line',
     data: { datasets: [{ label: '总资产', data: hourlyComb, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } }
   });
-
   chartPie = new Chart($el('chartAssetPie').getContext('2d'), {
     type: 'doughnut',
     data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] },
@@ -437,12 +388,13 @@ function updatePieChart(total) {
   
   const d = new Date();
   const label = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:00`;
+  // 整点记录历史
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
     hourlyComb.push({ x: label, y: total });
     if(hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
     chartLine.data.datasets[0].data = hourlyComb;
     chartLine.update();
-    saveToCloud();
+    saveToCloud(); // 记录新点时上传
   }
 }
 
