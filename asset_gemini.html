@@ -2,64 +2,52 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>v11 - 个人资产看板 (智能压缩防爆版)</title>
+  <title>v12 - 个人资产看板 (时光机瘦身版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script> <style>
-    :root {
-      --bg-body: #0f172a; --bg-card: #1e293b; --bg-modal: #334155;
-      --text-primary: #f1f5f9; --text-secondary: #94a3b8;
-      --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
-      --border-color: #475569;
-    }
-    body { margin: 0; background: var(--bg-body); color: var(--text-primary); font-family: 'Segoe UI', sans-serif; }
-    
-    header { background: var(--bg-card); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-    header h1 { margin: 0; font-size: 1.4rem; color: var(--accent-blue); }
-    .header-controls { display: flex; align-items: center; gap: 15px; }
-    .btn-config { background: transparent; border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 5px 12px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
-    .btn-config:hover { background: var(--accent-blue); color: white; }
-    .total-worth-display span { color: var(--accent-green); font-weight: bold; font-size: 1.2rem; }
 
-    .container { width: 95%; max-width: 1400px; margin: 20px auto; }
-    .row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
-    .col { background: var(--bg-card); border-radius: 12px; padding: 20px; flex: 1; min-width: 320px; border: 1px solid var(--border-color); }
-    h3.panel-title { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; color: var(--text-secondary); }
-
-    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
-    .input-group label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
-    .input-group input { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 6px; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { padding: 8px; border-bottom: 1px solid var(--border-color); text-align: left; }
-    th { color: var(--text-secondary); }
-    .val-cell { font-family: 'Consolas', monospace; }
-    
-    .status-bar { margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: right; }
-    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 5px; }
-    .status-dot.active { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
-    .chart-box { height: 350px; position: relative; }
-
+  <style>
+    /* 样式保持不变 */
+    :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
+    body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:'Segoe UI',sans-serif; }
+    header { background:var(--bg-card); padding:15px 20px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; }
+    header h1 { margin:0; font-size:1.4rem; color:var(--accent-blue); }
+    .header-controls { display:flex; align-items:center; gap:15px; }
+    .btn-config { background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); padding:5px 12px; border-radius:4px; cursor:pointer; transition:0.2s; }
+    .btn-config:hover { background:var(--accent-blue); color:white; }
+    .total-worth-display span { color:var(--accent-green); font-weight:bold; font-size:1.2rem; }
+    .container { width:95%; max-width:1400px; margin:20px auto; }
+    .row { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:20px; }
+    .col { background:var(--bg-card); border-radius:12px; padding:20px; flex:1; min-width:320px; border:1px solid var(--border-color); }
+    h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); }
+    .asset-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-bottom:15px; }
+    .input-group label { display:block; font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px; }
+    .input-group input { width:100%; box-sizing:border-box; background:#0f172a; border:1px solid var(--border-color); color:white; padding:6px; border-radius:4px; }
+    table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+    th, td { padding:8px; border-bottom:1px solid var(--border-color); text-align:left; }
+    th { color:var(--text-secondary); }
+    .status-bar { margin-top:10px; font-size:0.8rem; color:var(--text-secondary); text-align:right; }
+    .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#ef4444; margin-right:5px; }
+    .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
+    .chart-box { height:350px; position:relative; }
     /* Modal */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
-    .modal-content { background: var(--bg-card); width: 90%; max-width: 500px; max-height: 85vh; border-radius: 12px; border: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .close-modal { cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); }
-    .config-section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
-    .config-section h4 { color: var(--accent-blue); margin: 0 0 10px 0; }
-    .config-list { list-style: none; padding: 0; margin: 0; }
-    .config-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; }
-    .btn-delete { color: var(--accent-red); cursor: pointer; transition: 0.2s; }
-    .btn-delete:hover { transform: scale(1.2); }
-    .add-row { display: flex; gap: 10px; margin-top: 10px; }
-    .add-row input { flex: 1; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 8px; border-radius: 4px; }
-    .btn-add { background: var(--accent-green); color: #000; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    .btn-reset { background: #475569; color: #fff; border: none; padding: 10px; width: 100%; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:999; justify-content:center; align-items:center; }
+    .modal-content { background:var(--bg-card); width:90%; max-width:500px; max-height:85vh; border-radius:12px; border:1px solid var(--border-color); padding:20px; display:flex; flex-direction:column; overflow-y:auto; }
+    .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+    .close-modal { cursor:pointer; font-size:1.5rem; color:var(--text-secondary); }
+    .config-section { margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid var(--border-color); }
+    .config-item { display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); margin-bottom:8px; padding:8px 12px; border-radius:6px; }
+    .btn-delete { color:var(--accent-red); cursor:pointer; }
+    .add-row { display:flex; gap:10px; margin-top:10px; }
+    .add-row input { flex:1; background:#0f172a; border:1px solid var(--border-color); color:white; padding:8px; border-radius:4px; }
+    .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:4px; cursor:pointer; font-weight:bold; }
+    .btn-reset { background:#475569; color:#fff; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; margin-top:10px; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>我的资产看板 v11</h1>
+    <h1>我的资产看板 v12</h1>
     <div class="header-controls">
       <div class="total-worth-display">总净值: <span id="headerTotal">--</span></div>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 管理配置</button>
@@ -91,7 +79,7 @@
     </div>
     <div class="row">
       <div class="col" style="flex:2;">
-        <h3 class="panel-title">资产趋势 (智能压缩)</h3>
+        <h3 class="panel-title">资产趋势 (混合频率存储)</h3>
         <div class="chart-box"><canvas id="chartHourComb"></canvas></div>
       </div>
       <div class="col" style="flex:1;">
@@ -103,25 +91,16 @@
 
   <div class="modal-overlay" id="configModal">
     <div class="modal-content">
-      <div class="modal-header">
-        <h2><i class="fas fa-edit"></i> 管理资产列表</h2>
-        <span class="close-modal" onclick="closeConfigModal()">&times;</span>
+      <div class="modal-header"><h2>管理资产列表</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
+      <div class="config-section">
+        <h4 style="color:var(--accent-blue)">加密货币</h4>
+        <ul id="cryptoConfigList" style="list-style:none;padding:0"></ul>
+        <div class="add-row"><input type="text" id="newCryptoSymbol" placeholder="如 DOGE"><button class="btn-add" onclick="addCryptoAsset()">添加</button></div>
       </div>
       <div class="config-section">
-        <h4>加密货币</h4>
-        <ul class="config-list" id="cryptoConfigList"></ul>
-        <div class="add-row">
-          <input type="text" id="newCryptoSymbol" placeholder="代码 (如 DOGE)">
-          <button class="btn-add" onclick="addCryptoAsset()">添加</button>
-        </div>
-      </div>
-      <div class="config-section">
-        <h4>美股/现金</h4>
-        <ul class="config-list" id="stockConfigList"></ul>
-        <div class="add-row">
-          <input type="text" id="newStockSymbol" placeholder="代码 (如 AAPL)">
-          <button class="btn-add" onclick="addStockAsset()">添加</button>
-        </div>
+        <h4 style="color:var(--accent-blue)">美股/现金</h4>
+        <ul id="stockConfigList" style="list-style:none;padding:0"></ul>
+        <div class="add-row"><input type="text" id="newStockSymbol" placeholder="如 AAPL"><button class="btn-add" onclick="addStockAsset()">添加</button></div>
       </div>
       <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
     </div>
@@ -129,14 +108,11 @@
 
 <script>
 /*************************************************************
- * 1. 云端配置
+ * 1. 配置区域
  *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
-
-// 免费版限制 100KB, 我们留 5KB 余量 = 95KB
-const MAX_PAYLOAD_SIZE = 95 * 1024; 
 
 const DEFAULT_CRYPTO = [ { symbol: 'BTC', wsKey: 'btcusdt' }, { symbol: 'ETH', wsKey: 'ethusdt' }, { symbol: 'SOL', wsKey: 'solusdt' }, { symbol: 'USDT', wsKey: null, isStable: true } ];
 const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD', isCash: true } ];
@@ -147,54 +123,31 @@ let cryptoWS = null, chartLine, chartPie, stockInterval = null;
 const $el = (id) => document.getElementById(id);
 
 /*************************************************************
- * 2. 核心: 云端加载 (含解压逻辑)
+ * 2. 云端加载
  *************************************************************/
 async function loadConfig() {
   $el('wsStatusText').textContent = '连接云端...';
-  
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_KEY }
-    });
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     if (!res.ok) throw new Error("连接失败: " + res.status);
-    
     const json = await res.json();
     const data = json.record; 
 
-    cryptoConfig = (data.cryptoConfig && data.cryptoConfig.length > 0) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
-    stockConfig  = (data.stockConfig && data.stockConfig.length > 0) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
+    cryptoConfig = (data.cryptoConfig && data.cryptoConfig.length) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
+    stockConfig  = (data.stockConfig && data.stockConfig.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
     quantities   = data.quantities || {};
 
-    // ★★★ 解压逻辑 ★★★
-    // 云端可能是 V10 的对象数组 [{x:..., y:...}]，也可能是 V11 的压缩数组 [[ts, val], ...]
+    // ★★★ V12 解压逻辑 (兼容 V10/V11) ★★★
     let rawHistory = data.hourlyComb || [];
-    
-    // 如果是 V11 压缩格式 (数组的数组)，转回 Chart.js 需要的对象格式
     if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) {
-      hourlyComb = rawHistory.map(item => ({
-        x: formatTs(item[0]), // 转换时间戳 -> 字符串
-        y: item[1]
-      }));
+      // 如果是 V11/V12 的压缩数组格式 [ts, val]
+      hourlyComb = rawHistory.map(item => ({ x: formatTs(item[0]), y: item[1] }));
     } else {
-      hourlyComb = rawHistory; // 旧格式直接用
+      // 兼容旧格式 {x:..., y:...}
+      hourlyComb = rawHistory;
     }
 
-    // 本地迁移逻辑 (保留)
-    if (!hourlyComb || hourlyComb.length < 2) {
-      try {
-        const localRaw = localStorage.getItem('hourlyComb');
-        if (localRaw) {
-          const localData = JSON.parse(localRaw);
-          if (Array.isArray(localData) && localData.length > hourlyComb.length) {
-            console.log("检测到本地历史数据，迁移...");
-            hourlyComb = localData; 
-            setTimeout(saveToCloud, 3000); // 稍后自动保存(会触发压缩)
-          }
-        }
-      } catch(e) {}
-    }
-
-    // Init Prices
+    // 初始化价格字典
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
@@ -207,82 +160,80 @@ async function loadConfig() {
     restartServices();
     initCharts(); 
     $el('wsStatusText').textContent = '云端同步正常';
-    
-    // 如果是空的，初始化一下
-    if (!data.cryptoConfig) saveToCloud();
+
+    // 首次加载立即执行一次“瘦身保存”，把之前的旧数据优化掉
+    if (hourlyComb.length > 100) saveToCloud();
 
   } catch (err) {
     console.error(err);
     $el('wsStatusText').textContent = '离线模式';
-    alert("云端读取失败: " + err.message + "\n将使用离线/默认配置。");
+    alert("云端读取失败: " + err.message);
     // Fallback
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
     isDataLoaded = true;
-    renderUI();
-    restartServices();
-    initCharts();
+    renderUI(); restartServices(); initCharts();
   }
 }
 
 /*************************************************************
- * 3. 核心: 云端保存 (含压缩与裁剪逻辑)
+ * 3. ★★★ 核心: 智能压缩保存 ★★★
  *************************************************************/
 async function saveToCloud() {
   if (!isDataLoaded) return;
 
-  // ★★★ 压缩步骤 ★★★
-  // 把 [{x:'2023-12-23 10:00', y:1234.56}] 
-  // 变成 [[1703325600000, 1234]] (去掉了key，去掉了长字符串，取整)
-  const compressedHistory = hourlyComb.map(p => {
-    // 尝试解析日期字符串为时间戳
-    const ts = new Date(p.x).getTime();
-    // 如果解析失败(旧数据可能有问题)，就丢弃或保留原样(这里简化为当前时间)
-    return [!isNaN(ts) ? ts : Date.now(), Math.round(p.y)]; 
-  });
+  // 1. 数据清洗与压缩
+  // 策略：最近30天保留小时级数据；超过30天只保留每天0点的数据
+  const now = Date.now();
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+  const optimizedHistory = [];
+  const seenDays = new Set(); // 用于去重每天的数据
+
+  // 从后往前遍历（因为我们要优先保留最新的）
+  for (let i = hourlyComb.length - 1; i >= 0; i--) {
+    const point = hourlyComb[i];
+    const ts = new Date(point.x).getTime();
+    if (isNaN(ts)) continue;
+
+    const isRecent = (now - ts) < THIRTY_DAYS;
+    
+    if (isRecent) {
+      // 最近30天：全部保留
+      // 存为 [时间戳, 整数金额] 以进一步压缩
+      optimizedHistory.unshift([ts, Math.round(point.y)]);
+    } else {
+      // 30天前：每天只留一条
+      const dateStr = point.x.split(' ')[0]; // 取 YYYY-MM-DD
+      if (!seenDays.has(dateStr)) {
+        optimizedHistory.unshift([ts, Math.round(point.y)]);
+        seenDays.add(dateStr);
+      }
+    }
+  }
 
   const payload = { 
     cryptoConfig, 
     stockConfig, 
     quantities, 
-    hourlyComb: compressedHistory // 上传压缩版
+    hourlyComb: optimizedHistory // 上传优化后的数据
   };
 
-  // ★★★ 安全刹车: 检查大小 ★★★
-  let jsonString = JSON.stringify(payload);
-  let bytes = new Blob([jsonString]).size;
-  console.log(`当前数据大小: ${(bytes/1024).toFixed(2)} KB`);
-
-  // 如果超过限制，开始从头部(最旧的数据)删除，直到达标
-  if (bytes > MAX_PAYLOAD_SIZE) {
-    console.warn("数据超过 100KB 限制，正在裁剪旧数据...");
-    while (bytes > MAX_PAYLOAD_SIZE && payload.hourlyComb.length > 0) {
-      // 每次删掉 24 个点 (约一天的数据)，加快裁剪速度
-      payload.hourlyComb.splice(0, 24);
-      jsonString = JSON.stringify(payload);
-      bytes = new Blob([jsonString]).size;
-    }
-    // 同步回内存中的 hourlyComb，防止下次又超
-    // 注意：内存中需要保持对象格式，所以这里不动内存，只动上传数据
-    // 下次 loadConfig 时会加载裁剪后的数据
-    console.log(`裁剪完成，剩余大小: ${(bytes/1024).toFixed(2)} KB`);
-  }
+  // 2. 检查大小 (Debug用)
+  const jsonString = JSON.stringify(payload);
+  const kb = (new Blob([jsonString]).size / 1024).toFixed(2);
+  console.log(`V12 优化后数据大小: ${kb} KB (点数: ${optimizedHistory.length})`);
 
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: jsonString
     });
-    if(!res.ok && res.status === 403) {
-      alert("警告：即便经过压缩，数据依然超过限制 (403)。建议重置数据。");
-    } else {
-      console.log('云端已保存');
-    }
+    console.log('云端已保存');
   } catch(e) { console.error('保存失败', e); }
 }
 
-// 辅助: 时间戳转 'YYYY-MM-DD HH:00'
 function formatTs(ts) {
   const d = new Date(ts);
   const pad = n => n<10?'0'+n:n;
@@ -290,7 +241,7 @@ function formatTs(ts) {
 }
 
 /*************************************************************
- * 4. 界面渲染
+ * 4. UI与逻辑
  *************************************************************/
 function renderUI() {
   const cIn = $el('cryptoInputs'); cIn.innerHTML = '';
@@ -300,7 +251,6 @@ function renderUI() {
     cIn.insertAdjacentHTML('beforeend', `<div class="input-group"><label>${c.symbol}</label><input type="number" step="any" data-key="${k}" value="${quantities[k]}"></div>`);
     cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
   });
-
   const sIn = $el('stockInputs'); sIn.innerHTML = '';
   const sTb = $el('stockTableBody'); sTb.innerHTML = '';
   stockConfig.forEach(s => {
@@ -308,14 +258,12 @@ function renderUI() {
     sIn.insertAdjacentHTML('beforeend', `<div class="input-group"><label>${s.symbol}</label><input type="number" step="any" data-key="${k}" value="${quantities[k]}"></div>`);
     sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
   });
-
   document.querySelectorAll('input[type="number"]').forEach(el => {
     el.oninput = function() {
       const k = this.getAttribute('data-key');
       quantities[k] = parseFloat(this.value) || 0;
       if($el(`q_${k}`)) $el(`q_${k}`).textContent = quantities[k];
-      recalc();
-      saveToCloud();
+      recalc(); saveToCloud();
     };
   });
   recalc();
@@ -344,9 +292,7 @@ function recalc() {
   updatePieChart(all);
 }
 
-/*************************************************************
- * 5. 配置管理
- *************************************************************/
+// Config Modal
 function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
 function closeConfigModal() { $el('configModal').style.display = 'none'; }
 function renderConfigList() {
@@ -377,15 +323,12 @@ function resetToDefault() {
   if(confirm('重置将清空所有数据，确定吗？')) {
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
-    quantities = {}; hourlyComb = []; // 清空历史
-    saveToCloud();
-    location.reload();
+    quantities = {}; hourlyComb = [];
+    saveToCloud(); location.reload();
   }
 }
 
-/*************************************************************
- * 6. 服务与图表
- *************************************************************/
+// Services
 function restartServices() {
   if(cryptoWS) cryptoWS.close();
   const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
@@ -450,7 +393,7 @@ function updatePieChart(total) {
   
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
     hourlyComb.push({ x: label, y: total });
-    // 注意：这里内存中不shift，让saveToCloud去处理裁剪
+    // 更新时保持内存中是完整对象，但调用 saveToCloud 时会自动压缩和抽稀
     chartLine.data.datasets[0].data = hourlyComb;
     chartLine.update();
     saveToCloud(); 
