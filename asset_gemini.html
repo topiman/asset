@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>v9 - 个人资产看板 (历史数据同步版)</title>
+  <title>v10 - 个人资产看板 (无限制历史记录版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -60,7 +60,7 @@
 <body>
 
   <header>
-    <h1>我的资产看板 v9</h1>
+    <h1>我的资产看板 v10</h1>
     <div class="header-controls">
       <div class="total-worth-display">总净值: <span id="headerTotal">--</span></div>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 管理配置</button>
@@ -92,7 +92,7 @@
     </div>
     <div class="row">
       <div class="col" style="flex:2;">
-        <h3 class="panel-title">资产趋势 (1年)</h3>
+        <h3 class="panel-title">资产趋势 (无限制)</h3>
         <div class="chart-box"><canvas id="chartHourComb"></canvas></div>
       </div>
       <div class="col" style="flex:1;">
@@ -130,12 +130,13 @@
 
 <script>
 /*************************************************************
- * 1. 云端配置
+ * 1. 云端配置 (已填入正确 ID/Key)
  *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
-const MAX_HOUR_LEN = 8760;
+
+// 注意：移除了 MAX_HOUR_LEN 常量
 
 const DEFAULT_CRYPTO = [ { symbol: 'BTC', wsKey: 'btcusdt' }, { symbol: 'ETH', wsKey: 'ethusdt' }, { symbol: 'SOL', wsKey: 'solusdt' }, { symbol: 'USDT', wsKey: null, isStable: true } ];
 const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD', isCash: true } ];
@@ -166,22 +167,18 @@ async function loadConfig() {
     quantities   = data.quantities || {};
     hourlyComb   = data.hourlyComb || [];
 
-    // ★★★ V9 核心升级：历史数据迁移 ★★★
-    // 逻辑：如果云端的历史数据是空的（或者很少），说明是第一次同步
-    // 我们就检查本地 LocalStorage 里有没有旧版留下的数据，如果有，就合并过来。
+    // V9/V10 历史数据迁移逻辑
     if (!hourlyComb || hourlyComb.length < 2) {
       try {
         const localRaw = localStorage.getItem('hourlyComb');
         if (localRaw) {
           const localData = JSON.parse(localRaw);
           if (Array.isArray(localData) && localData.length > hourlyComb.length) {
-            console.log("检测到本地有更完整的历史数据，正在迁移...");
-            hourlyComb = localData; // 使用本地数据覆盖/填充
-            
-            // 稍后强制保存一次，这样数据就上云了
+            console.log("检测到本地有历史数据，迁移并上传...");
+            hourlyComb = localData; 
             setTimeout(() => {
               saveToCloud();
-              console.log("本地历史数据已自动上传云端。");
+              console.log("本地历史数据已自动上传。");
             }, 3000);
           }
         }
@@ -201,7 +198,6 @@ async function loadConfig() {
     initCharts(); 
     $el('wsStatusText').textContent = '云端同步正常';
     
-    // 如果是初始空数据，保存一次以初始化结构
     if (!data.cryptoConfig) saveToCloud();
 
   } catch (err) {
@@ -219,7 +215,6 @@ async function loadConfig() {
 
 async function saveToCloud() {
   if (!isDataLoaded) return;
-  // 这里把 hourlyComb 也放进 payload，实现了历史趋势上云
   const payload = { cryptoConfig, stockConfig, quantities, hourlyComb };
   try {
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
@@ -388,13 +383,16 @@ function updatePieChart(total) {
   
   const d = new Date();
   const label = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:00`;
-  // 整点记录历史
+  
+  // ★★★ V10 重点修改：移除长度检查 ★★★
+  // 原逻辑：if (hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
+  // 现逻辑：只 push，不 shift
+  
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
     hourlyComb.push({ x: label, y: total });
-    if(hourlyComb.length > MAX_HOUR_LEN) hourlyComb.shift();
     chartLine.data.datasets[0].data = hourlyComb;
     chartLine.update();
-    saveToCloud(); // 记录新点时上传
+    saveToCloud(); 
   }
 }
 
