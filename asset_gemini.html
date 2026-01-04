@@ -3,78 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v14 - 个人资产看板 (纯净配置版)</title>
+  <title>v15 - 个人资产看板 (数据完整性保护版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
+    /* 样式与 V14 保持一致 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
-    
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
-
-    /* Header */
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
     .header-controls { display:flex; align-items:center; gap:10px; }
     .btn-config { background:rgba(56, 189, 248, 0.1); border:1px solid var(--accent-blue); color:var(--accent-blue); padding:6px 12px; border-radius:6px; cursor:pointer; font-size: 0.9rem; }
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
-
-    /* Layout */
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
     .row { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
     .col { background:var(--bg-card); border-radius:12px; padding:15px; flex:1; min-width:300px; border:1px solid var(--border-color); }
-    
     h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
-
-    /* Table (纯净版不再有Input Grid) */
     table { width:100%; border-collapse:collapse; font-size:0.9rem; margin-top: 10px; }
     th, td { padding:10px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
     th { color:var(--text-secondary); font-weight: normal; font-size: 0.8rem; }
     .val-cell { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
-    
     .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
     .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; }
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
-    
     .chart-box { position:relative; height:350px; }
-    @media (max-width: 768px) {
-      .col { min-width: 100%; }
-      .chart-box { height: 250px; }
-    }
-
-    /* Modal Styles (增强版) */
+    @media (max-width: 768px) { .col { min-width: 100%; } .chart-box { height: 250px; } }
     .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; }
     @media (min-width: 769px) { .modal-overlay { align-items: center; } }
-    
     .modal-content { background:var(--bg-card); width:95%; max-width:550px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
     @media (min-width: 769px) { .modal-content { border-radius: 12px; margin-bottom: auto; } }
-
     .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
     .close-modal { cursor:pointer; font-size:1.5rem; color:var(--text-secondary); padding: 5px; }
     .config-section { margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid var(--border-color); }
-    
-    /* 配置列表项样式 */
     .config-list { list-style:none; padding:0; margin:0; }
     .config-item { display:flex; align-items:center; background:rgba(255,255,255,0.05); margin-bottom:8px; padding:8px 12px; border-radius:6px; gap: 10px; }
     .config-symbol { flex: 1; font-weight: bold; font-size: 0.95rem; }
     .config-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:6px; border-radius:4px; font-size: 16px; text-align: right; }
     .btn-delete { color:var(--accent-red); cursor:pointer; padding: 5px; margin-left: 5px; }
-    
-    /* 添加行样式 */
     .add-row { display:flex; gap:10px; margin-top:10px; }
     .add-input-sym { flex:1; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; text-transform: uppercase; }
     .add-input-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; }
     .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; white-space: nowrap; }
-    
     .btn-reset { background:#475569; color:#fff; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; margin-top:10px; font-size: 1rem; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>资产看板 v14</h1>
+    <h1>资产看板 v15</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值</small>
@@ -183,7 +162,7 @@ async function loadConfig() {
       hourlyComb = rawHistory;
     }
 
-    // 初始化价格
+    // 初始化价格 (非稳定币初始为0，表明未加载)
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
@@ -207,10 +186,44 @@ async function loadConfig() {
 }
 
 /*************************************************************
- * 3. 云端保存
+ * 3. ★★★ 核心: 智能压缩保存 + 完整性检查 ★★★
  *************************************************************/
+ 
+// 新增函数：检查所有持仓资产的价格是否已就绪
+function isDataComplete() {
+  // 1. 检查加密货币
+  for (let c of cryptoConfig) {
+    const k = c.symbol.toLowerCase();
+    const q = quantities[k] || 0;
+    const p = prices[k] || 0;
+    // 如果持有该资产(数量>0)，且它不是稳定币，但价格仍为0 => 数据不全，不能保存
+    if (q > 0 && !c.isStable && p <= 0) return false;
+  }
+  
+  // 2. 检查股票
+  for (let s of stockConfig) {
+    const k = s.symbol.toLowerCase();
+    const q = quantities[k] || 0;
+    const p = prices[k] || 0;
+    // 如果持有股票(数量>0)，且不是现金，但价格仍为0 => 数据不全
+    if (q > 0 && !s.isCash && p <= 0) return false;
+  }
+  
+  return true;
+}
+
 async function saveToCloud() {
   if (!isDataLoaded) return;
+
+  // ★★★ 安全阀：如果数据不完整，禁止保存历史记录 ★★★
+  // 这防止了因为API延迟导致总资产瞬间归零或暴跌被记录下来的问题
+  if (!isDataComplete()) {
+    console.log("数据不完整(部分持仓价格未获取)，跳过保存");
+    // 可以选择在界面上提示一下，或者静默跳过
+    // $el('wsStatusText').textContent = '等待价格...'; 
+    return;
+  }
+
   const now = Date.now();
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
   const optimizedHistory = [];
@@ -239,6 +252,7 @@ async function saveToCloud() {
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: JSON.stringify(payload)
     });
+    console.log("云端保存成功");
   } catch(e) { console.error('保存失败', e); }
 }
 
@@ -249,10 +263,9 @@ function formatTs(ts) {
 }
 
 /*************************************************************
- * 4. UI 渲染 (纯净版)
+ * 4. UI 渲染
  *************************************************************/
 function renderUI() {
-  // 只渲染表格，不再渲染主界面的输入框
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
@@ -276,7 +289,7 @@ function recalc() {
     const p = prices[k]||0; const q = quantities[k]||0;
     const v = p*q; cTotal += v;
     if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
-    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q; // 确保数量显示最新
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
   });
 
@@ -298,7 +311,7 @@ function recalc() {
 }
 
 /*************************************************************
- * 5. Modal 逻辑 (含数量修改)
+ * 5. Modal 逻辑
  *************************************************************/
 function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
 function closeConfigModal() { $el('configModal').style.display = 'none'; }
@@ -308,7 +321,6 @@ function renderConfigList() {
   cryptoConfig.forEach((item, idx) => {
     const k = item.symbol.toLowerCase();
     const isFixed = (item.symbol === 'USDT');
-    // 生成列表项：符号 + 数量输入 + 删除按钮
     cList.insertAdjacentHTML('beforeend', `
       <li class="config-item">
         <span class="config-symbol">${item.symbol}</span>
@@ -332,13 +344,9 @@ function renderConfigList() {
   });
 }
 
-// 统一更新数量函数
 window.updateQty = function(key, val) {
   quantities[key] = parseFloat(val) || 0;
-  // 在这里只重算，不频繁保存，利用防抖或简单依赖用户关闭时的保存也可以
-  // 为了体验，这里每次输入都重算UI，保存加个简单防抖最好，或者直接存
-  recalc(); 
-  saveToCloud();
+  recalc(); saveToCloud();
 };
 
 function addCryptoAsset() {
@@ -350,9 +358,7 @@ function addCryptoAsset() {
   if(!sym) return;
   if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
   
-  // 添加配置
   cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' });
-  // 添加初始数量
   quantities[sym.toLowerCase()] = qty;
   
   symInput.value = ''; qtyInput.value = '';
@@ -395,7 +401,7 @@ function resetToDefault() {
 }
 
 /*************************************************************
- * 6. Services & Charts (保持 V13)
+ * 6. Services & Charts
  *************************************************************/
 function restartServices() {
   if(cryptoWS) cryptoWS.close();
@@ -457,11 +463,21 @@ function updatePieChart(total) {
   const pad = n => n<10?'0'+n:n;
   const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
   
+  // 这里调用 saveToCloud()，而在 saveToCloud 内部会检查 isDataComplete()
+  // 如果数据不全，saveToCloud 会自动 abort，不会向 hourlyComb 写入错误数据
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
-    hourlyComb.push({ x: label, y: total });
-    chartLine.data.datasets[0].data = hourlyComb;
-    chartLine.update();
-    saveToCloud(); 
+    if (isDataComplete()) {
+        hourlyComb.push({ x: label, y: total });
+        chartLine.data.datasets[0].data = hourlyComb;
+        chartLine.update();
+        saveToCloud(); 
+    } else {
+        // 数据未就绪，仅更新 UI (饼图)，不记录历史点
+        console.log("数据未就绪，暂不记录历史点");
+    }
+  } else {
+      // 同一小时内，仅更新数据
+      saveToCloud();
   }
 }
 
