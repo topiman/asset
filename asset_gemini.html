@@ -3,44 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v16 - 个人资产看板 (占比直显版)</title>
+  <title>v17 - 个人资产看板 (频率优化版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
+    /* 样式保持不变 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
-    
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
-
-    /* Header */
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
     .header-controls { display:flex; align-items:center; gap:10px; }
     .btn-config { background:rgba(56, 189, 248, 0.1); border:1px solid var(--accent-blue); color:var(--accent-blue); padding:6px 12px; border-radius:6px; cursor:pointer; font-size: 0.9rem; }
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
-
-    /* Layout */
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
     .row { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
     .col { background:var(--bg-card); border-radius:12px; padding:15px; flex:1; min-width:300px; border:1px solid var(--border-color); }
-    
     h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
-
     table { width:100%; border-collapse:collapse; font-size:0.9rem; margin-top: 10px; }
     th, td { padding:10px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
     th { color:var(--text-secondary); font-weight: normal; font-size: 0.8rem; }
     .val-cell { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
-    
     .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
     .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; }
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
-    
     .chart-box { position:relative; height:350px; }
     @media (max-width: 768px) { .col { min-width: 100%; } .chart-box { height: 250px; } }
-
-    /* Modal */
     .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; }
     @media (min-width: 769px) { .modal-overlay { align-items: center; } }
     .modal-content { background:var(--bg-card); width:95%; max-width:550px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
@@ -63,7 +53,7 @@
 <body>
 
   <header>
-    <h1>资产看板 v16</h1>
+    <h1>资产看板 v17</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值</small>
@@ -150,6 +140,9 @@ let cryptoConfig = [], stockConfig = [], quantities = {}, prices = {}, hourlyCom
 let cryptoWS = null, chartLine, chartPie, stockInterval = null;
 const $el = (id) => document.getElementById(id);
 
+// ★★★ 防抖计时器 ★★★
+let saveTimer = null;
+
 /*************************************************************
  * 2. 云端加载
  *************************************************************/
@@ -182,7 +175,9 @@ async function loadConfig() {
     isDataLoaded = true;
     renderUI(); restartServices(); initCharts(); 
     $el('wsStatusText').textContent = '已连接';
-    if (hourlyComb.length > 100) saveToCloud();
+    
+    // 首次加载不强制保存，除非历史记录过长需要压缩
+    if (hourlyComb.length > 200) debounceSave();
 
   } catch (err) {
     console.error(err);
@@ -195,7 +190,7 @@ async function loadConfig() {
 }
 
 /*************************************************************
- * 3. 核心: 智能压缩保存 + 完整性检查
+ * 3. 核心: 智能保存 (含防抖 + 频率优化)
  *************************************************************/
 function isDataComplete() {
   for (let c of cryptoConfig) {
@@ -209,12 +204,18 @@ function isDataComplete() {
   return true;
 }
 
+// 防抖保存：输入框变化时调用，延迟 2秒 保存
+function debounceSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToCloud, 2000);
+}
+
+// 立即保存：添加/删除资产时调用
 async function saveToCloud() {
   if (!isDataLoaded) return;
-  if (!isDataComplete()) {
-    console.log("数据不完整，跳过保存");
-    return;
-  }
+  // 注意：这里移除了 isDataComplete 的强制检查，因为如果是修改配置(比如删了一个币)，
+  // 即使价格没获取到，也应该允许保存配置。
+  // 只有在“自动记录历史点”时才需要严格检查价格完整性。
 
   const now = Date.now();
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -244,7 +245,7 @@ async function saveToCloud() {
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: JSON.stringify(payload)
     });
-    console.log("云端保存成功");
+    console.log("云端保存成功 " + new Date().toLocaleTimeString());
   } catch(e) { console.error('保存失败', e); }
 }
 
@@ -338,7 +339,8 @@ function renderConfigList() {
 
 window.updateQty = function(key, val) {
   quantities[key] = parseFloat(val) || 0;
-  recalc(); saveToCloud();
+  recalc(); 
+  debounceSave(); // ★ 延迟保存
 };
 
 function addCryptoAsset() {
@@ -435,7 +437,6 @@ function initCharts() {
         legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } },
         tooltip: {
           callbacks: {
-            // ★★★ Tooltip 简化: 因为图例有了百分比，Tooltip 只显示金额即可 ★★★
             label: function(ctx) {
               const v = ctx.parsed;
               return `${ctx.label.split(' ')[0]}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`;
@@ -455,7 +456,6 @@ function updatePieChart(total) {
     if(v > 10) { labels.push(item.symbol); data.push(v); }
   });
   
-  // ★★★ 这里计算百分比并写入图例标签 ★★★
   const pieTotal = data.reduce((a,b)=>a+b, 0);
   const labelsWithPct = labels.map((l, i) => {
     const p = pieTotal > 0 ? ((data[i] / pieTotal) * 100).toFixed(1) : '0.0';
@@ -471,15 +471,16 @@ function updatePieChart(total) {
   const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
   
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
+    // 只有在“新小时生成”且“数据完整”时才保存历史点
     if (isDataComplete()) {
         hourlyComb.push({ x: label, y: total });
         chartLine.data.datasets[0].data = hourlyComb;
         chartLine.update();
-        saveToCloud(); 
+        saveToCloud(); // 低频保存
     }
-  } else {
-      saveToCloud();
-  }
+  } 
+  // ★★★ 移除了 else { saveToCloud() } ★★★
+  // 现在的逻辑：普通的价格刷新只更新图表和UI，不上传云端。
 }
 
 window.onload = loadConfig;
