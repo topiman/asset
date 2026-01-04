@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v24 - 个人资产看板 (完美修复版)</title>
+  <title>v25 - 个人资产看板 (图表完美修复版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 样式与 V23 保持一致 */
+    /* 样式部分 (保持 V24 极简风格) */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
@@ -62,7 +62,7 @@
 <body>
 
   <header>
-    <h1>资产看板 v24</h1>
+    <h1>资产看板 v25</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值 (实时)</small>
@@ -150,21 +150,25 @@ async function loadConfig() {
     processCloudData(json.record);
 
     isDataLoaded = true;
-    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS();
-    // 移除旧代码：$el('wsStatusText').textContent = '已连接'; 
+    renderUI(); 
+    initCharts(); // 初始化图表实例
+    startBinanceWS(); 
+    initStockDataAndWS();
+    
+    // ★ V25 关键修复: 加载完成后强制刷新一次图表数据，防止显示空白
+    refreshCharts(); 
+
   } catch (err) {
     console.error(err);
     alert('离线模式: ' + err.message);
     processCloudData({}); 
     isDataLoaded = true;
-    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS();
+    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
   }
 }
 
 function processCloudData(data) {
   dataVersion = data.version || 0; 
-  console.log("当前本地版本:", dataVersion);
-
   cryptoConfig = (data.cryptoConfig?.length) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
   stockConfig  = (data.stockConfig?.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
   quantities   = data.quantities || {};
@@ -184,26 +188,28 @@ function processCloudData(data) {
   });
 }
 
-// 3. 安全保存 (版本控制)
+// 3. 安全保存
 async function saveToCloud(isManual = false) {
   if (!isDataLoaded) return;
-  if (!isManual && !isDataComplete()) { console.log("数据不全，跳过自动保存"); return; }
+  if (!isManual && !isDataComplete()) return;
 
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
-    if (!res.ok) throw new Error("无法连接云端检查版本");
+    if (!res.ok) throw new Error("Check version failed");
     
     const json = await res.json();
     const cloudVersion = json.record.version || 0;
 
     if (cloudVersion !== dataVersion) {
-      console.warn(`版本冲突! 本地:${dataVersion}, 云端:${cloudVersion}`);
-      alert("⚠️ 同步冲突：云端配置已更新。\n\n系统将自动重新加载最新配置。");
+      console.warn(`版本冲突: 本地${dataVersion} vs 云端${cloudVersion}`);
+      alert("⚠️ 检测到多端数据更新，正在同步最新数据...");
       processCloudData(json.record); 
       renderUI(); 
+      refreshCharts(); // ★ 数据同步后，强制刷新图表
       return; 
     }
 
+    // 准备历史数据
     const now = Date.now();
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const optimizedHistory = [];
@@ -237,9 +243,9 @@ async function saveToCloud(isManual = false) {
     });
 
     dataVersion = nextVersion;
-    console.log(`保存成功! 版本:${dataVersion}`);
+    console.log(`Saved v${dataVersion}`);
 
-  } catch(e) { console.error('保存失败', e); }
+  } catch(e) { console.error('Save failed', e); }
 }
 
 function isDataComplete() {
@@ -304,7 +310,11 @@ function recalc() {
   $el('cryptoTotalDisplay').textContent = cTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
   $el('stockTotalDisplay').textContent = sTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
   $el('headerTotal').textContent = all.toLocaleString('en-US',{style:'currency',currency:'USD'});
-  updatePieChart(all);
+  
+  checkHistory(all); // 检查是否需要记录历史
+  
+  // 实时刷新饼图 (如果图表已初始化)
+  if(chartPie) refreshCharts(); 
 }
 
 function updateChangeCell(el, val, isStable) {
@@ -401,24 +411,45 @@ async function initStockDataAndWS() {
   finnhubWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); if (msg.type === 'trade' && msg.data) { msg.data.forEach(t => { const k = t.s.toLowerCase(); if (prices[k] !== undefined) { prices[k] = t.p; recalc(); } }); } } catch(e) {} };
 }
 
+// 7. Charts
 function initCharts() {
   if(chartLine) chartLine.destroy(); if(chartPie) chartPie.destroy();
-  chartLine = new Chart($el('chartHourComb').getContext('2d'), { type: 'line', data: { datasets: [{ label: '总资产', data: hourlyComb, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } } });
+  chartLine = new Chart($el('chartHourComb').getContext('2d'), { type: 'line', data: { datasets: [{ label: '总资产', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } } });
   chartPie = new Chart($el('chartAssetPie').getContext('2d'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } }, tooltip: { callbacks: { label: function(ctx) { const v = ctx.parsed; return `${ctx.label.split(' ')[0]}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`; } } } } } });
 }
-function updatePieChart(total) {
-  if(!chartPie) return;
+
+// ★ V25 核心：强制刷新图表数据的函数
+function refreshCharts() {
+  if(!chartLine || !chartPie) return;
+
+  // 1. 刷新 K 线图
+  chartLine.data.datasets[0].data = hourlyComb; 
+  chartLine.update();
+
+  // 2. 刷新 饼图
   let labels = [], data = [];
-  [...cryptoConfig, ...stockConfig].forEach(item => { const k = item.symbol.toLowerCase(); const v = (prices[k]||0) * (quantities[k]||0); if(v > 10) { labels.push(item.symbol); data.push(v); } });
+  [...cryptoConfig, ...stockConfig].forEach(item => { const k = item.symbol.toLowerCase(); const v = (prices[k]||0) * (quantities[k]||0); if(v > 0) { labels.push(item.symbol); data.push(v); } }); // 只要大于0就显示
+  
   const pieTotal = data.reduce((a,b)=>a+b, 0);
   const labelsWithPct = labels.map((l, i) => { const p = pieTotal > 0 ? ((data[i] / pieTotal) * 100).toFixed(1) : '0.0'; return `${l} ${p}%`; });
-  chartPie.data.labels = labelsWithPct; chartPie.data.datasets[0].data = data; chartPie.update();
   
+  chartPie.data.labels = labelsWithPct; 
+  chartPie.data.datasets[0].data = data; 
+  chartPie.update();
+}
+
+// 检查是否需要记录历史 (每小时)
+function checkHistory(total) {
   const d = new Date(); const pad = n => n<10?'0'+n:n;
   const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
   
+  // 如果当前小时还没有点，且数据完整，则记录
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
-    if (isDataComplete()) { hourlyComb.push({ x: label, y: total }); chartLine.data.datasets[0].data = hourlyComb; chartLine.update(); saveToCloud(false); }
+    if (isDataComplete()) { 
+        hourlyComb.push({ x: label, y: total }); 
+        refreshCharts(); // 记录后刷新图表
+        saveToCloud(false); 
+    }
   }
 }
 
