@@ -3,18 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v13 - 个人资产看板 (移动端适配版)</title>
+  <title>v14 - 个人资产看板 (纯净配置版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     
-    /* 基础重置 */
-    body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
 
-    /* Header 适配 */
+    /* Header */
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
     .header-controls { display:flex; align-items:center; gap:10px; }
@@ -22,67 +21,66 @@
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
 
-    /* 布局适配 */
+    /* Layout */
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
     .row { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
-    /* 手机上强制单列占满 */
     .col { background:var(--bg-card); border-radius:12px; padding:15px; flex:1; min-width:300px; border:1px solid var(--border-color); }
     
     h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
 
-    /* 表单与表格 */
-    .asset-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; margin-bottom:15px; }
-    .input-group label { display:block; font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px; }
-    /* 手机输入框优化：16px防止缩放，高度加大 */
-    .input-group input { width:100%; background:#0f172a; border:1px solid var(--border-color); color:white; padding:8px; border-radius:6px; font-size:16px; -webkit-appearance: none; }
-    .input-group input:focus { border-color: var(--accent-blue); outline: none; }
-    
-    table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-    th, td { padding:8px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
-    th { color:var(--text-secondary); font-weight: normal; }
+    /* Table (纯净版不再有Input Grid) */
+    table { width:100%; border-collapse:collapse; font-size:0.9rem; margin-top: 10px; }
+    th, td { padding:10px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
+    th { color:var(--text-secondary); font-weight: normal; font-size: 0.8rem; }
     .val-cell { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
     
     .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
     .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; }
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
     
-    /* 图表高度：手机上矮一点，电脑上高一点 */
     .chart-box { position:relative; height:350px; }
     @media (max-width: 768px) {
-      .col { min-width: 100%; } /* 手机端强制100%宽 */
-      .chart-box { height: 250px; } /* 手机端图表变矮，方便滑动 */
-      .total-worth-display span { font-size: 1rem; }
-      header h1 { font-size: 1.1rem; }
+      .col { min-width: 100%; }
+      .chart-box { height: 250px; }
     }
 
-    /* Modal 适配 */
-    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; } /* 手机端默认底部对齐? 不，居中更好 */
+    /* Modal Styles (增强版) */
+    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; }
     @media (min-width: 769px) { .modal-overlay { align-items: center; } }
     
-    .modal-content { background:var(--bg-card); width:95%; max-width:500px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); margin-bottom: 0; }
+    .modal-content { background:var(--bg-card); width:95%; max-width:550px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
     @media (min-width: 769px) { .modal-content { border-radius: 12px; margin-bottom: auto; } }
 
     .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
     .close-modal { cursor:pointer; font-size:1.5rem; color:var(--text-secondary); padding: 5px; }
     .config-section { margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid var(--border-color); }
-    .config-item { display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); margin-bottom:8px; padding:10px; border-radius:6px; font-size: 0.9rem; }
-    .btn-delete { color:var(--accent-red); cursor:pointer; padding: 5px 10px; }
+    
+    /* 配置列表项样式 */
+    .config-list { list-style:none; padding:0; margin:0; }
+    .config-item { display:flex; align-items:center; background:rgba(255,255,255,0.05); margin-bottom:8px; padding:8px 12px; border-radius:6px; gap: 10px; }
+    .config-symbol { flex: 1; font-weight: bold; font-size: 0.95rem; }
+    .config-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:6px; border-radius:4px; font-size: 16px; text-align: right; }
+    .btn-delete { color:var(--accent-red); cursor:pointer; padding: 5px; margin-left: 5px; }
+    
+    /* 添加行样式 */
     .add-row { display:flex; gap:10px; margin-top:10px; }
-    .add-row input { flex:1; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; }
-    .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; }
+    .add-input-sym { flex:1; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; text-transform: uppercase; }
+    .add-input-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; }
+    .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; white-space: nowrap; }
+    
     .btn-reset { background:#475569; color:#fff; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; margin-top:10px; font-size: 1rem; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>资产看板 v13</h1>
+    <h1>资产看板 v14</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值</small>
         <span id="headerTotal">--</span>
       </div>
-      <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i></button>
+      <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 设置</button>
     </div>
   </header>
 
@@ -90,9 +88,8 @@
     <div class="row">
       <div class="col">
         <h3 class="panel-title">加密货币 <small id="cryptoTotalDisplay" style="color:var(--accent-blue)">--</small></h3>
-        <div class="asset-grid" id="cryptoInputs"></div>
         <table>
-          <thead><tr><th>资产</th><th>价格</th><th>持仓</th><th>价值</th></tr></thead>
+          <thead><tr><th>资产</th><th>价格</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="cryptoTableBody"></tbody>
         </table>
         <div class="status-bar"><span id="wsDot" class="status-dot"></span><span id="wsStatusText">检查连接...</span></div>
@@ -100,9 +97,8 @@
       
       <div class="col">
         <h3 class="panel-title">美股/现金 <small id="stockTotalDisplay" style="color:var(--accent-blue)">--</small></h3>
-        <div class="asset-grid" id="stockInputs"></div>
         <table>
-          <thead><tr><th>代码</th><th>价格</th><th>持仓</th><th>价值</th></tr></thead>
+          <thead><tr><th>代码</th><th>价格</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="stockTableBody"></tbody>
         </table>
         <div class="status-bar"><span id="apiDot" class="status-dot"></span><span id="apiStatusText">Finnhub API</span></div>
@@ -123,24 +119,35 @@
 
   <div class="modal-overlay" id="configModal">
     <div class="modal-content">
-      <div class="modal-header"><h2>管理资产</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
+      <div class="modal-header"><h2>资产配置 & 持仓</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
+      
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">加密货币</h4>
-        <ul id="cryptoConfigList" style="list-style:none;padding:0"></ul>
-        <div class="add-row"><input type="text" id="newCryptoSymbol" placeholder="代码 (如 DOGE)"><button class="btn-add" onclick="addCryptoAsset()">+</button></div>
+        <ul id="cryptoConfigList" class="config-list"></ul>
+        <div class="add-row">
+          <input type="text" class="add-input-sym" id="newCryptoSymbol" placeholder="代码 (如 DOGE)">
+          <input type="number" class="add-input-qty" id="newCryptoQty" placeholder="数量">
+          <button class="btn-add" onclick="addCryptoAsset()">添加</button>
+        </div>
       </div>
+
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">美股/现金</h4>
-        <ul id="stockConfigList" style="list-style:none;padding:0"></ul>
-        <div class="add-row"><input type="text" id="newStockSymbol" placeholder="代码 (如 AAPL)"><button class="btn-add" onclick="addStockAsset()">+</button></div>
+        <ul id="stockConfigList" class="config-list"></ul>
+        <div class="add-row">
+          <input type="text" class="add-input-sym" id="newStockSymbol" placeholder="代码 (如 AAPL)">
+          <input type="number" class="add-input-qty" id="newStockQty" placeholder="数量">
+          <button class="btn-add" onclick="addStockAsset()">添加</button>
+        </div>
       </div>
+
       <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
     </div>
   </div>
 
 <script>
 /*************************************************************
- * 1. 配置区域 (V12 逻辑保持不变)
+ * 1. 配置区域
  *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
@@ -155,7 +162,7 @@ let cryptoWS = null, chartLine, chartPie, stockInterval = null;
 const $el = (id) => document.getElementById(id);
 
 /*************************************************************
- * 2. 云端加载 (含 V12 智能解压)
+ * 2. 云端加载
  *************************************************************/
 async function loadConfig() {
   $el('wsStatusText').textContent = '连接云端...';
@@ -176,6 +183,7 @@ async function loadConfig() {
       hourlyComb = rawHistory;
     }
 
+    // 初始化价格
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
@@ -186,8 +194,6 @@ async function loadConfig() {
     isDataLoaded = true;
     renderUI(); restartServices(); initCharts(); 
     $el('wsStatusText').textContent = '已连接';
-    
-    // 首次自动优化
     if (hourlyComb.length > 100) saveToCloud();
 
   } catch (err) {
@@ -201,7 +207,7 @@ async function loadConfig() {
 }
 
 /*************************************************************
- * 3. 云端保存 (含 V12 智能压缩)
+ * 3. 云端保存
  *************************************************************/
 async function saveToCloud() {
   if (!isDataLoaded) return;
@@ -243,85 +249,142 @@ function formatTs(ts) {
 }
 
 /*************************************************************
- * 4. UI 渲染 (移动端优化)
+ * 4. UI 渲染 (纯净版)
  *************************************************************/
 function renderUI() {
-  const cIn = $el('cryptoInputs'); cIn.innerHTML = '';
+  // 只渲染表格，不再渲染主界面的输入框
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
-    cIn.insertAdjacentHTML('beforeend', `<div class="input-group"><label>${c.symbol}</label><input type="number" step="any" data-key="${k}" value="${quantities[k]}"></div>`);
-    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
+    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
-  const sIn = $el('stockInputs'); sIn.innerHTML = '';
+
   const sTb = $el('stockTableBody'); sTb.innerHTML = '';
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
-    sIn.insertAdjacentHTML('beforeend', `<div class="input-group"><label>${s.symbol}</label><input type="number" step="any" data-key="${k}" value="${quantities[k]}"></div>`);
-    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" id="q_${k}">${quantities[k]}</td><td class="val-cell" id="v_${k}">--</td></tr>`);
+    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
 
-  document.querySelectorAll('input[type="number"]').forEach(el => {
-    el.oninput = function() {
-      const k = this.getAttribute('data-key');
-      quantities[k] = parseFloat(this.value) || 0;
-      if($el(`q_${k}`)) $el(`q_${k}`).textContent = quantities[k];
-      recalc(); saveToCloud();
-    };
-  });
   recalc();
 }
 
 function recalc() {
   let cTotal = 0, sTotal = 0;
+  
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
     const v = p*q; cTotal += v;
     if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q; // 确保数量显示最新
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
   });
+
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
     const v = p*q; sTotal += v;
     if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
   });
+
   const all = cTotal + sTotal;
   $el('cryptoTotalDisplay').textContent = cTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
   $el('stockTotalDisplay').textContent = sTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
   $el('headerTotal').textContent = all.toLocaleString('en-US',{style:'currency',currency:'USD'});
+  
   updatePieChart(all);
 }
 
-// Modal Logic
+/*************************************************************
+ * 5. Modal 逻辑 (含数量修改)
+ *************************************************************/
 function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
 function closeConfigModal() { $el('configModal').style.display = 'none'; }
+
 function renderConfigList() {
   const cList = $el('cryptoConfigList'); cList.innerHTML = '';
   cryptoConfig.forEach((item, idx) => {
-    cList.insertAdjacentHTML('beforeend', `<li class="config-item"><span>${item.symbol}</span>${item.symbol!=='USDT' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeCrypto(${idx})"><i class="fas fa-trash"></i></i>` : ''}</li>`);
+    const k = item.symbol.toLowerCase();
+    const isFixed = (item.symbol === 'USDT');
+    // 生成列表项：符号 + 数量输入 + 删除按钮
+    cList.insertAdjacentHTML('beforeend', `
+      <li class="config-item">
+        <span class="config-symbol">${item.symbol}</span>
+        <input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)">
+        ${!isFixed ? `<i class="fas fa-trash-alt btn-delete" onclick="removeCrypto(${idx})"></i>` : '<span style="width:24px"></span>'}
+      </li>
+    `);
   });
+
   const sList = $el('stockConfigList'); sList.innerHTML = '';
   stockConfig.forEach((item, idx) => {
-    sList.insertAdjacentHTML('beforeend', `<li class="config-item"><span>${item.symbol}</span>${item.symbol!=='USD' ? `<i class="fas fa-trash-alt btn-delete" onclick="removeStock(${idx})"><i class="fas fa-trash"></i></i>` : ''}</li>`);
+    const k = item.symbol.toLowerCase();
+    const isFixed = (item.symbol === 'USD');
+    sList.insertAdjacentHTML('beforeend', `
+      <li class="config-item">
+        <span class="config-symbol">${item.symbol}</span>
+        <input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)">
+        ${!isFixed ? `<i class="fas fa-trash-alt btn-delete" onclick="removeStock(${idx})"></i>` : '<span style="width:24px"></span>'}
+      </li>
+    `);
   });
 }
+
+// 统一更新数量函数
+window.updateQty = function(key, val) {
+  quantities[key] = parseFloat(val) || 0;
+  // 在这里只重算，不频繁保存，利用防抖或简单依赖用户关闭时的保存也可以
+  // 为了体验，这里每次输入都重算UI，保存加个简单防抖最好，或者直接存
+  recalc(); 
+  saveToCloud();
+};
+
 function addCryptoAsset() {
-  const input = $el('newCryptoSymbol'); const sym = input.value.toUpperCase().trim();
-  if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
+  const symInput = $el('newCryptoSymbol');
+  const qtyInput = $el('newCryptoQty');
+  const sym = symInput.value.toUpperCase().trim();
+  const qty = parseFloat(qtyInput.value) || 0;
+
+  if(!sym) return;
+  if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
+  
+  // 添加配置
   cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' });
-  input.value = ''; renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  // 添加初始数量
+  quantities[sym.toLowerCase()] = qty;
+  
+  symInput.value = ''; qtyInput.value = '';
+  renderConfigList(); saveToCloud(); renderUI(); restartServices();
 }
-function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
+
+function removeCrypto(idx) { 
+  cryptoConfig.splice(idx, 1); 
+  renderConfigList(); saveToCloud(); renderUI(); restartServices(); 
+}
+
 function addStockAsset() {
-  const input = $el('newStockSymbol'); const sym = input.value.toUpperCase().trim();
-  if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
+  const symInput = $el('newStockSymbol');
+  const qtyInput = $el('newStockQty');
+  const sym = symInput.value.toUpperCase().trim();
+  const qty = parseFloat(qtyInput.value) || 0;
+
+  if(!sym) return;
+  if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
+  
   stockConfig.push({ symbol: sym });
-  input.value = ''; renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  quantities[sym.toLowerCase()] = qty;
+  
+  symInput.value = ''; qtyInput.value = '';
+  renderConfigList(); saveToCloud(); renderUI(); restartServices();
 }
-function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
+
+function removeStock(idx) { 
+  stockConfig.splice(idx, 1); 
+  renderConfigList(); saveToCloud(); renderUI(); restartServices(); 
+}
+
 function resetToDefault() {
   if(confirm('重置将清空所有数据，确定吗？')) {
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
@@ -331,7 +394,9 @@ function resetToDefault() {
   }
 }
 
-// Services
+/*************************************************************
+ * 6. Services & Charts (保持 V13)
+ *************************************************************/
 function restartServices() {
   if(cryptoWS) cryptoWS.close();
   const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
@@ -360,7 +425,6 @@ async function fetchStocks() {
   recalc();
 }
 
-// Charts
 function initCharts() {
   if(chartLine) chartLine.destroy();
   if(chartPie) chartPie.destroy();
