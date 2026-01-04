@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v28 - 个人资产看板 (全面抢救版)</title>
+  <title>v29 - 个人资产看板 (强制合并版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 样式与 V27 保持一致 */
+    /* 样式部分保持不变 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
@@ -63,7 +63,7 @@
 <body>
 
   <header>
-    <h1>资产看板 v28</h1>
+    <h1>资产看板 v29</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值 (实时)</small>
@@ -122,8 +122,8 @@
         </div>
       </div>
 
-      <button class="btn-reset" onclick="resetToDefault()">重置所有数据 (清空)</button>
-      <button class="btn-reset btn-recover" onclick="recoverFromLocal()">🛠️ 尝试从本地缓存恢复数据</button>
+      <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
+      <button class="btn-reset btn-recover" onclick="recoverFromLocal()">🛠️ 强制合并本地数据 (解决数据丢失)</button>
     </div>
   </div>
 
@@ -157,11 +157,9 @@ async function loadConfig() {
     isDataLoaded = true;
     renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
 
-    // 自动抢救 (如果云端数据很少)
-    if (hourlyComb.length < 5) {
-      console.log("云端为空，自动尝试本地恢复...");
-      recoverFromLocal(true); 
-    }
+    // ★★★ V29 启动时强制执行一次智能合并 ★★★
+    // 不管云端有没有数据，都检查一遍本地有没有“遗珠”
+    setTimeout(() => recoverFromLocal(true), 1000);
 
   } catch (err) {
     console.error(err);
@@ -172,66 +170,70 @@ async function loadConfig() {
   }
 }
 
-// ★★★ 核心修复: 全面数据抢救 (含美股) ★★★
+// ★★★ 核心修复: 智能合并 (Merge Logic) ★★★
 function recoverFromLocal(isAuto = false) {
-  let foundCount = 0;
+  let hasChanges = false;
   
-  // 1. 历史 K 线
+  // 1. 扫描加密货币旧持仓
   try {
-    const localRaw = localStorage.getItem('hourlyComb');
-    if (localRaw) {
-      const localData = JSON.parse(localRaw);
-      if (Array.isArray(localData) && localData.length > hourlyComb.length) {
-        hourlyComb = localData; 
-        foundCount++;
-      }
-    }
-  } catch(e) {}
-
-  // 2. 加密货币持仓 (V2~V14 myCryptoQty)
-  try {
-    const oldQ = localStorage.getItem('myCryptoQty');
+    const oldQ = localStorage.getItem('myCryptoQty'); // V2版 Key
     if (oldQ) {
         const qObj = JSON.parse(oldQ);
         for(let k in qObj) { 
-            if(!quantities[k]) quantities[k] = qObj[k]; 
-            // 确保币种在配置里
-            const sym = k.toUpperCase();
-            if(!cryptoConfig.find(c=>c.symbol===sym) && sym !== 'USDT') {
-                cryptoConfig.push({symbol:sym, wsKey:sym.toLowerCase()+'usdt'});
+            const oldVal = parseFloat(qObj[k]) || 0;
+            const curVal = quantities[k] || 0;
+            // 如果本地有，云端没有(或为0)，则合并
+            if (oldVal > 0 && curVal === 0) {
+                quantities[k] = oldVal;
+                // 确保配置存在
+                const sym = k.toUpperCase();
+                if(!cryptoConfig.find(c=>c.symbol===sym) && sym !== 'USDT') {
+                    cryptoConfig.push({symbol:sym, wsKey:sym.toLowerCase()+'usdt'});
+                }
+                hasChanges = true;
+                console.log(`已找回 Crypto: ${sym} = ${oldVal}`);
             }
         }
-        foundCount++;
     }
   } catch(e) {}
 
-  // 3. ★ 新增: 美股持仓 (V2~V14 myStockQty)
+  // 2. 扫描美股旧持仓 (V2版 Key)
   try {
     const oldS = localStorage.getItem('myStockQty');
     if (oldS) {
         const sObj = JSON.parse(oldS);
         for(let k in sObj) { 
-            if(!quantities[k]) quantities[k] = sObj[k];
-            // 确保美股在配置里
-            const sym = k.toUpperCase();
-            if(!stockConfig.find(s=>s.symbol===sym) && sym !== 'USD') {
-                stockConfig.push({symbol:sym});
+            const oldVal = parseFloat(sObj[k]) || 0;
+            const curVal = quantities[k] || 0;
+            if (oldVal > 0 && curVal === 0) {
+                quantities[k] = oldVal;
+                const sym = k.toUpperCase();
+                // 如果是 USD，它是固定资产，可能不在 Config 列表显示但需要计算
+                // 如果是股票，检查 Config
+                if (sym !== 'USD' && !stockConfig.find(s=>s.symbol===sym)) {
+                    stockConfig.push({symbol:sym});
+                }
+                hasChanges = true;
+                console.log(`已找回 Stock: ${sym} = ${oldVal}`);
             }
         }
-        foundCount++;
     }
   } catch(e) {}
 
-  // 4. 结算
-  if (foundCount > 0) {
-    if (!isAuto) alert(`成功找回本地旧数据 (含美股)！\n\n系统将立即同步到云端。`);
-    else console.log("自动找回本地数据，上传中...");
+  // 3. 结算
+  if (hasChanges) {
+    if (!isAuto) alert(`成功合并本地遗漏数据！\n\n数据正在同步到云端...`);
+    else console.log("自动合并本地遗漏数据...");
     
     refreshCharts();
     renderUI();
-    saveToCloud(true); // 强制保存
+    saveToCloud(true); // 强制上传新合并的数据
+    
+    // 如果加了新配置，需要重启服务订阅行情
+    startBinanceWS();
+    initStockDataAndWS();
   } else {
-    if (!isAuto) alert("本地未发现可恢复的旧版数据。");
+    if (!isAuto) alert("本地没有发现比云端更新的遗漏数据。");
   }
 }
 
@@ -431,7 +433,7 @@ function addStockAsset() {
   $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS();
 }
 function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
-function resetToDefault() { if(confirm('重置将清空所有数据，确定吗？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
+function resetToDefault() { if(confirm('确定重置？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
 
 // 6. Services & Charts
 function startBinanceWS() {
