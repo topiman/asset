@@ -3,22 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v19 - 个人资产看板 (涨跌幅监控版)</title>
+  <title>v20 - 个人资产看板 (全时段实时版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 基础样式 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
+    
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
 
-    /* 涨跌幅颜色类 */
-    .trend-up { color: var(--accent-green); font-weight: bold; }
-    .trend-down { color: var(--accent-red); font-weight: bold; }
-    .trend-flat { color: var(--text-secondary); }
+    /* 涨跌幅颜色 */
+    .trend-up { color: var(--accent-green); font-weight: 700; }
+    .trend-down { color: var(--accent-red); font-weight: 700; }
+    .trend-flat { color: var(--text-secondary); opacity: 0.7; }
 
-    /* Header */
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
     .header-controls { display:flex; align-items:center; gap:10px; }
@@ -26,20 +25,19 @@
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
 
-    /* Layout */
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
     .row { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
     .col { background:var(--bg-card); border-radius:12px; padding:15px; flex:1; min-width:300px; border:1px solid var(--border-color); }
     h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
 
-    /* Table */
     table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top: 10px; }
     th, td { padding:10px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
     th { color:var(--text-secondary); font-weight: normal; font-size: 0.8rem; }
     .val-cell { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
     
-    .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
-    .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; }
+    .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .status-item { display: flex; align-items: center; gap: 4px; }
+    .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; transition: background 0.3s; }
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
     
     .chart-box { position:relative; height:350px; }
@@ -75,13 +73,13 @@
 <body>
 
   <header>
-    <h1>资产看板 v19</h1>
+    <h1>资产看板 v20</h1>
     <div class="header-controls">
       <div class="total-worth-display">
-        <small style="color:var(--text-secondary)">总净值</small>
+        <small style="color:var(--text-secondary)">总净值 (实时)</small>
         <span id="headerTotal">--</span>
       </div>
-      <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i> 设置</button>
+      <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i></button>
     </div>
   </header>
 
@@ -93,7 +91,9 @@
           <thead><tr><th>资产</th><th>价格</th><th style="text-align:right">24h%</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="cryptoTableBody"></tbody>
         </table>
-        <div class="status-bar"><span id="wsDot" class="status-dot"></span><span id="wsStatusText">检查连接...</span></div>
+        <div class="status-bar">
+          <div class="status-item"><span id="wsBinanceDot" class="status-dot"></span> Binance</div>
+        </div>
       </div>
       
       <div class="col">
@@ -102,7 +102,9 @@
           <thead><tr><th>代码</th><th>价格</th><th style="text-align:right">24h%</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="stockTableBody"></tbody>
         </table>
-        <div class="status-bar"><span id="apiDot" class="status-dot"></span><span id="apiStatusText">Finnhub API</span></div>
+        <div class="status-bar">
+          <div class="status-item"><span id="wsFinnhubDot" class="status-dot"></span> Finnhub WS</div>
+        </div>
       </div>
     </div>
 
@@ -126,9 +128,9 @@
         <h4 style="color:var(--accent-blue)">加密货币</h4>
         <ul id="cryptoConfigList" class="config-list"></ul>
         <div class="add-row">
-          <input type="text" class="add-input-sym" id="newCryptoSymbol" placeholder="代码 (如 DOGE)">
+          <input type="text" class="add-input-sym" id="newCryptoSymbol" placeholder="如 BTC">
           <input type="number" class="add-input-qty" id="newCryptoQty" placeholder="数量">
-          <button class="btn-add" onclick="addCryptoAsset()">添加</button>
+          <button class="btn-add" onclick="addCryptoAsset()">+</button>
         </div>
       </div>
 
@@ -136,9 +138,9 @@
         <h4 style="color:var(--accent-blue)">美股/现金</h4>
         <ul id="stockConfigList" class="config-list"></ul>
         <div class="add-row">
-          <input type="text" class="add-input-sym" id="newStockSymbol" placeholder="代码 (如 AAPL)">
+          <input type="text" class="add-input-sym" id="newStockSymbol" placeholder="如 TSLA">
           <input type="number" class="add-input-qty" id="newStockQty" placeholder="数量">
-          <button class="btn-add" onclick="addStockAsset()">添加</button>
+          <button class="btn-add" onclick="addStockAsset()">+</button>
         </div>
       </div>
 
@@ -159,17 +161,25 @@ const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD',
 
 let isDataLoaded = false;
 let cryptoConfig = [], stockConfig = [], quantities = {};
-// ★★★ 新增 changes 对象用于存储涨跌幅 ★★★
-let prices = {}, changes = {}, hourlyComb = [];
-let cryptoWS = null, chartLine, chartPie, stockInterval = null;
+// 价格状态
+let prices = {};
+let changes = {};
+let prevCloses = {}; // ★ 新增：存储昨日收盘价，用于计算实时涨跌幅
+let hourlyComb = [];
+
+// WS 实例
+let binanceWS = null;
+let finnhubWS = null; // ★ 新增 Finnhub WS
+let chartLine, chartPie;
 let saveTimer = null;
+
 const $el = (id) => document.getElementById(id);
 
 /*************************************************************
  * 2. 云端加载
  *************************************************************/
 async function loadConfig() {
-  $el('wsStatusText').textContent = '连接云端...';
+  // ... 云端加载逻辑与 V19 相同 ...
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     if (!res.ok) throw new Error("连接失败");
@@ -190,29 +200,34 @@ async function loadConfig() {
     [...cryptoConfig, ...stockConfig].forEach(item => {
       const k = item.symbol.toLowerCase();
       if (quantities[k] === undefined) quantities[k] = 0;
-      if (item.isStable || item.isCash) prices[k] = 1;
-      else if (!prices[k]) prices[k] = 0;
-      // 初始化涨跌幅为0
-      changes[k] = 0;
+      // 重置状态
+      if (item.isStable || item.isCash) { prices[k] = 1; prevCloses[k] = 1; }
+      else { if(!prices[k]) prices[k] = 0; } // 价格保留内存值或0
     });
 
     isDataLoaded = true;
-    renderUI(); restartServices(); initCharts(); 
-    $el('wsStatusText').textContent = '已连接';
+    renderUI(); 
+    initCharts(); 
+    
+    // ★ 启动双引擎 ★
+    startBinanceWS();
+    initStockDataAndWS(); // 包含 REST 初始化 + WS 启动
+
     if (hourlyComb.length > 200) debounceSave();
 
   } catch (err) {
     console.error(err);
-    $el('wsStatusText').textContent = '离线';
+    alert('离线模式: ' + err.message);
+    // Fallback logic...
     cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
     stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
     isDataLoaded = true;
-    renderUI(); restartServices(); initCharts();
+    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS();
   }
 }
 
 /*************************************************************
- * 3. 核心保存逻辑 (不变)
+ * 3. 核心保存 (保持 V19 的防抖)
  *************************************************************/
 function isDataComplete() {
   for (let c of cryptoConfig) {
@@ -261,7 +276,7 @@ async function saveToCloud() {
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: JSON.stringify(payload)
     });
-    console.log("云端保存成功 " + new Date().toLocaleTimeString());
+    console.log("云端保存: " + new Date().toLocaleTimeString());
   } catch(e) { console.error('保存失败', e); }
 }
 
@@ -272,7 +287,7 @@ function formatTs(ts) {
 }
 
 /*************************************************************
- * 4. UI 渲染 (新增 24h% 列)
+ * 4. UI 渲染
  *************************************************************/
 function renderUI() {
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
@@ -282,7 +297,8 @@ function renderUI() {
       <tr>
         <td><b>${c.symbol}</b></td>
         <td class="val-cell" id="p_${k}">--</td>
-        <td class="val-cell" style="text-align:right" id="chg_${k}">--</td> <td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td>
+        <td class="val-cell" style="text-align:right" id="chg_${k}">--</td>
+        <td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td>
         <td class="val-cell" style="text-align:right" id="v_${k}">--</td>
       </tr>
     `);
@@ -295,12 +311,12 @@ function renderUI() {
       <tr>
         <td><b>${s.symbol}</b></td>
         <td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td>
-        <td class="val-cell" style="text-align:right" id="chg_${k}">--</td> <td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td>
+        <td class="val-cell" style="text-align:right" id="chg_${k}">--</td>
+        <td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td>
         <td class="val-cell" style="text-align:right" id="v_${k}">--</td>
       </tr>
     `);
   });
-
   recalc();
 }
 
@@ -310,40 +326,31 @@ function recalc() {
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
-    const chg = changes[k] || 0; // 获取涨跌幅
     const v = p*q; cTotal += v;
     
     if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
     if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
     
-    // ★ 更新 24h% 颜色和数值 ★
-    const chgEl = $el(`chg_${k}`);
-    if (chgEl && !c.isStable) {
-        updateChangeCell(chgEl, chg);
-    } else if (chgEl) {
-        chgEl.textContent = '0.00%';
-        chgEl.className = 'val-cell trend-flat';
-    }
+    // Crypto 涨跌幅从 WS 直接获取 (changes[k])
+    updateChangeCell($el(`chg_${k}`), changes[k], c.isStable);
   });
 
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0;
-    const chg = changes[k] || 0;
     const v = p*q; sTotal += v;
     
     if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
     if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
 
-    const chgEl = $el(`chg_${k}`);
-    if (chgEl && !s.isCash) {
-        updateChangeCell(chgEl, chg);
-    } else if(chgEl) {
-        chgEl.textContent = '0.00%';
-        chgEl.className = 'val-cell trend-flat';
+    // Stock 涨跌幅需计算: (当前价 - 昨日收盘) / 昨日收盘
+    let chgPct = 0;
+    if (!s.isCash && p > 0 && prevCloses[k] > 0) {
+        chgPct = ((p - prevCloses[k]) / prevCloses[k]) * 100;
     }
+    updateChangeCell($el(`chg_${k}`), chgPct, s.isCash);
   });
 
   const all = cTotal + sTotal;
@@ -354,8 +361,12 @@ function recalc() {
   updatePieChart(all);
 }
 
-// 辅助：更新涨跌幅单元格样式
-function updateChangeCell(el, val) {
+function updateChangeCell(el, val, isStable) {
+    if (!el) return;
+    if (isStable) {
+        el.textContent = '0.00%'; el.className = 'val-cell trend-flat';
+        return;
+    }
     if (val > 0) {
         el.textContent = '+' + val.toFixed(2) + '%';
         el.className = 'val-cell trend-up';
@@ -369,16 +380,96 @@ function updateChangeCell(el, val) {
 }
 
 /*************************************************************
- * 5. Modal 逻辑
+ * 5. 服务: 双路 WebSocket (Binance + Finnhub)
  *************************************************************/
-function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
-function closeConfigModal() { $el('configModal').style.display = 'none'; }
 
-function renderConfigList() {
-  renderCryptoList();
-  renderStockList();
+// --- A. Crypto (Binance) ---
+function startBinanceWS() {
+  if(binanceWS) binanceWS.close();
+  const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
+  if(streams) {
+    binanceWS = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
+    binanceWS.onopen = () => { $el('wsBinanceDot').classList.add('active'); };
+    binanceWS.onclose = () => { $el('wsBinanceDot').classList.remove('active'); setTimeout(startBinanceWS, 5000); };
+    binanceWS.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        const symbol = cryptoConfig.find(c => c.wsKey && msg.stream.includes(c.wsKey));
+        if(symbol) { 
+            const k = symbol.symbol.toLowerCase();
+            prices[k] = parseFloat(msg.data.c);
+            changes[k] = parseFloat(msg.data.P); // Binance 直接给涨跌幅
+            recalc();
+        }
+      } catch(e){}
+    };
+  }
 }
 
+// --- B. Stocks (Finnhub REST + WS) ---
+async function initStockDataAndWS() {
+  // 1. 先调用一次 REST API 获取基础数据 (收盘价 pc 用于计算涨跌幅)
+  $el('apiDot').classList.remove('active');
+  const symbols = stockConfig.filter(s => !s.isCash).map(s => s.symbol);
+  if(symbols.length === 0) return;
+
+  // 获取初始快照
+  const promises = symbols.map(sym => fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_TOKEN}`).then(r=>r.json()).then(d=>({s:sym, p:d.c, pc:d.pc})).catch(()=>null));
+  
+  (await Promise.all(promises)).forEach(r => { 
+      if(r && r.p) {
+          const k = r.s.toLowerCase();
+          prices[k] = r.p;       // 初始价格
+          prevCloses[k] = r.pc;  // ★ 记录昨日收盘价
+      }
+  });
+  $el('apiDot').classList.add('active');
+  recalc(); // 刷新一次界面
+
+  // 2. 启动 Finnhub WebSocket 监听实时变动 (含盘前盘后)
+  startFinnhubWS(symbols);
+}
+
+function startFinnhubWS(symbols) {
+  if(finnhubWS) finnhubWS.close();
+  
+  finnhubWS = new WebSocket(`wss://ws.finnhub.io?token=${FINNHUB_TOKEN}`);
+  
+  finnhubWS.onopen = () => {
+    $el('wsFinnhubDot').classList.add('active');
+    // 订阅所有美股
+    symbols.forEach(sym => {
+        finnhubWS.send(JSON.stringify({ type: 'subscribe', symbol: sym }));
+    });
+  };
+  
+  finnhubWS.onclose = () => {
+    $el('wsFinnhubDot').classList.remove('active');
+    setTimeout(() => startFinnhubWS(symbols), 5000); // 断线重连
+  };
+
+  finnhubWS.onmessage = (evt) => {
+    try {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === 'trade' && msg.data) {
+        msg.data.forEach(trade => {
+            // trade.s 是 symbol (如 'TSLA'), trade.p 是实时成交价
+            const k = trade.s.toLowerCase();
+            // 只有是我们关注的股票才处理
+            if (prices[k] !== undefined) {
+                prices[k] = trade.p; // ★ 实时更新价格
+                recalc(); // 触发重算 (含涨跌幅计算)
+            }
+        });
+      }
+    } catch(e) {}
+  };
+}
+
+// ... Modal Logic (moveAsset, updateQty, etc. 保持 V18 不变) ...
+function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
+function closeConfigModal() { $el('configModal').style.display = 'none'; }
+function renderConfigList() { renderCryptoList(); renderStockList(); }
 function renderCryptoList() {
   const list = $el('cryptoConfigList'); list.innerHTML = '';
   const len = cryptoConfig.length;
@@ -388,17 +479,9 @@ function renderCryptoList() {
     const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('crypto', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
     const btnDown = idx < len - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('crypto', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
     const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeCrypto(${idx})"></i>` : `<span style="width:24px"></span>`;
-
-    list.insertAdjacentHTML('beforeend', `
-      <li class="config-item">
-        <span class="config-symbol">${item.symbol}</span>
-        <input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)">
-        <div class="action-group">${btnUp}${btnDown}${btnDel}</div>
-      </li>
-    `);
+    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
   });
 }
-
 function renderStockList() {
   const list = $el('stockConfigList'); list.innerHTML = '';
   const len = stockConfig.length;
@@ -408,172 +491,60 @@ function renderStockList() {
     const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('stock', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
     const btnDown = idx < len - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('stock', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
     const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeStock(${idx})"></i>` : `<span style="width:24px"></span>`;
-
-    list.insertAdjacentHTML('beforeend', `
-      <li class="config-item">
-        <span class="config-symbol">${item.symbol}</span>
-        <input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)">
-        <div class="action-group">${btnUp}${btnDown}${btnDel}</div>
-      </li>
-    `);
+    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
   });
 }
-
 window.moveAsset = function(type, idx, dir) {
   const arr = (type === 'crypto') ? cryptoConfig : stockConfig;
   const targetIdx = idx + dir;
   if (targetIdx < 0 || targetIdx >= arr.length) return;
   [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
-  renderConfigList(); renderUI(); saveToCloud(); restartServices();
+  renderConfigList(); renderUI(); saveToCloud();
+  // 重新订阅 WS 以防万一 (虽然不用，但为了逻辑完整)
+  if (type === 'crypto') startBinanceWS();
+  else initStockDataAndWS();
 };
-
-window.updateQty = function(key, val) {
-  quantities[key] = parseFloat(val) || 0;
-  recalc(); debounceSave();
-};
-
+window.updateQty = function(key, val) { quantities[key] = parseFloat(val) || 0; recalc(); debounceSave(); };
 function addCryptoAsset() {
-  const symInput = $el('newCryptoSymbol');
-  const qtyInput = $el('newCryptoQty');
-  const sym = symInput.value.toUpperCase().trim();
-  const qty = parseFloat(qtyInput.value) || 0;
-  if(!sym) return;
-  if(cryptoConfig.find(c => c.symbol === sym)) { alert('已存在'); return; }
-  cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' });
-  quantities[sym.toLowerCase()] = qty;
-  symInput.value = ''; qtyInput.value = '';
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  const sym = $el('newCryptoSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newCryptoQty').value)||0;
+  if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) return alert('已存在');
+  cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' }); quantities[sym.toLowerCase()] = qty;
+  $el('newCryptoSymbol').value = ''; renderConfigList(); saveToCloud(); renderUI(); startBinanceWS();
 }
-
-function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
-
+function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); startBinanceWS(); }
 function addStockAsset() {
-  const symInput = $el('newStockSymbol');
-  const qtyInput = $el('newStockQty');
-  const sym = symInput.value.toUpperCase().trim();
-  const qty = parseFloat(qtyInput.value) || 0;
-  if(!sym) return;
-  if(stockConfig.find(s => s.symbol === sym)) { alert('已存在'); return; }
-  stockConfig.push({ symbol: sym });
-  quantities[sym.toLowerCase()] = qty;
-  symInput.value = ''; qtyInput.value = '';
-  renderConfigList(); saveToCloud(); renderUI(); restartServices();
+  const sym = $el('newStockSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newStockQty').value)||0;
+  if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) return alert('已存在');
+  stockConfig.push({ symbol: sym }); quantities[sym.toLowerCase()] = qty;
+  $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(); renderUI(); initStockDataAndWS();
 }
+function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); initStockDataAndWS(); }
+function resetToDefault() { if(confirm('确定重置？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(); location.reload(); } }
 
-function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(); renderUI(); restartServices(); }
-
-function resetToDefault() {
-  if(confirm('重置将清空所有数据，确定吗？')) {
-    cryptoConfig = JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
-    stockConfig = JSON.parse(JSON.stringify(DEFAULT_STOCK));
-    quantities = {}; hourlyComb = [];
-    saveToCloud(); location.reload();
-  }
-}
-
-/*************************************************************
- * 6. Services & Charts (修改了数据提取逻辑)
- *************************************************************/
-function restartServices() {
-  if(cryptoWS) cryptoWS.close();
-  const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
-  if(streams) {
-    cryptoWS = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
-    cryptoWS.onopen = () => { $el('wsStatusText').textContent = 'Live'; $el('wsDot').classList.add('active'); };
-    cryptoWS.onmessage = (evt) => {
-      try {
-        const msg = JSON.parse(evt.data);
-        const symbol = cryptoConfig.find(c => c.wsKey && msg.stream.includes(c.wsKey));
-        if(symbol) {
-            const k = symbol.symbol.toLowerCase();
-            prices[k] = parseFloat(msg.data.c);
-            // ★★★ 提取 24h 涨跌幅 (字段 P) ★★★
-            changes[k] = parseFloat(msg.data.P); 
-            recalc();
-        }
-      } catch(e){}
-    };
-  }
-  if(stockInterval) clearInterval(stockInterval);
-  fetchStocks();
-  stockInterval = setInterval(fetchStocks, 30000);
-}
-
-async function fetchStocks() {
-  $el('apiDot').classList.remove('active');
-  const symbols = stockConfig.filter(s => !s.isCash).map(s => s.symbol);
-  if(symbols.length === 0) return;
-  const promises = symbols.map(sym => fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_TOKEN}`).then(r=>r.json()).then(d=>({s:sym, p:d.c, dp:d.dp})).catch(()=>null));
-  (await Promise.all(promises)).forEach(r => { 
-      if(r && r.p) {
-          const k = r.s.toLowerCase();
-          prices[k] = r.p;
-          // ★★★ 提取 24h 涨跌幅 (字段 dp) ★★★
-          changes[k] = r.dp; 
-      }
-  });
-  $el('apiDot').classList.add('active');
-  recalc();
-}
-
+// Charts (保持 V19)
 function initCharts() {
-  if(chartLine) chartLine.destroy();
-  if(chartPie) chartPie.destroy();
+  if(chartLine) chartLine.destroy(); if(chartPie) chartPie.destroy();
   chartLine = new Chart($el('chartHourComb').getContext('2d'), {
-    type: 'line',
-    data: { datasets: [{ label: '总资产', data: hourlyComb, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] },
+    type: 'line', data: { datasets: [{ label: '总资产', data: hourlyComb, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } }
   });
   chartPie = new Chart($el('chartAssetPie').getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] },
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false, 
-      plugins: { 
-        legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              const v = ctx.parsed;
-              return `${ctx.label.split(' ')[0]}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`;
-            }
-          }
-        }
-      } 
-    }
+    type: 'doughnut', data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } }, tooltip: { callbacks: { label: function(ctx) { const v = ctx.parsed; return `${ctx.label.split(' ')[0]}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`; } } } } }
   });
 }
 function updatePieChart(total) {
   if(!chartPie) return;
   let labels = [], data = [];
-  [...cryptoConfig, ...stockConfig].forEach(item => {
-    const k = item.symbol.toLowerCase();
-    const v = (prices[k]||0) * (quantities[k]||0);
-    if(v > 10) { labels.push(item.symbol); data.push(v); }
-  });
-  
+  [...cryptoConfig, ...stockConfig].forEach(item => { const k = item.symbol.toLowerCase(); const v = (prices[k]||0) * (quantities[k]||0); if(v > 10) { labels.push(item.symbol); data.push(v); } });
   const pieTotal = data.reduce((a,b)=>a+b, 0);
-  const labelsWithPct = labels.map((l, i) => {
-    const p = pieTotal > 0 ? ((data[i] / pieTotal) * 100).toFixed(1) : '0.0';
-    return `${l} ${p}%`;
-  });
-
-  chartPie.data.labels = labelsWithPct; 
-  chartPie.data.datasets[0].data = data; 
-  chartPie.update();
+  const labelsWithPct = labels.map((l, i) => { const p = pieTotal > 0 ? ((data[i] / pieTotal) * 100).toFixed(1) : '0.0'; return `${l} ${p}%`; });
+  chartPie.data.labels = labelsWithPct; chartPie.data.datasets[0].data = data; chartPie.update();
   
-  const d = new Date();
-  const pad = n => n<10?'0'+n:n;
+  const d = new Date(); const pad = n => n<10?'0'+n:n;
   const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
-  
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
-    if (isDataComplete()) {
-        hourlyComb.push({ x: label, y: total });
-        chartLine.data.datasets[0].data = hourlyComb;
-        chartLine.update();
-        saveToCloud(); 
-    }
+    if (isDataComplete()) { hourlyComb.push({ x: label, y: total }); chartLine.data.datasets[0].data = hourlyComb; chartLine.update(); saveToCloud(); }
   }
 }
 
