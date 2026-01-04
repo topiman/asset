@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v27 - 个人资产看板 (数据抢救版)</title>
+  <title>v28 - 个人资产看板 (全面抢救版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 保持 V26 样式 */
+    /* 样式与 V27 保持一致 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
@@ -63,7 +63,7 @@
 <body>
 
   <header>
-    <h1>资产看板 v27</h1>
+    <h1>资产看板 v28</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值 (实时)</small>
@@ -157,10 +157,10 @@ async function loadConfig() {
     isDataLoaded = true;
     renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
 
-    // ★★★ 自动抢救逻辑：如果云端历史数据很少，尝试本地查找 ★★★
+    // 自动抢救 (如果云端数据很少)
     if (hourlyComb.length < 5) {
-      console.log("云端数据似乎为空，尝试自动搜寻本地旧数据...");
-      recoverFromLocal(true); // true = 自动静默模式
+      console.log("云端为空，自动尝试本地恢复...");
+      recoverFromLocal(true); 
     }
 
   } catch (err) {
@@ -172,45 +172,66 @@ async function loadConfig() {
   }
 }
 
-// ★★★ 核心修复: 数据抢救函数 ★★★
+// ★★★ 核心修复: 全面数据抢救 (含美股) ★★★
 function recoverFromLocal(isAuto = false) {
   let foundCount = 0;
   
-  // 1. 尝试读取 V2 - V14 时代的 hourlyComb
+  // 1. 历史 K 线
   try {
     const localRaw = localStorage.getItem('hourlyComb');
     if (localRaw) {
       const localData = JSON.parse(localRaw);
       if (Array.isArray(localData) && localData.length > hourlyComb.length) {
-        hourlyComb = localData; // 覆盖内存中的历史
+        hourlyComb = localData; 
         foundCount++;
-        console.log("已找回历史K线数据点:", localData.length);
       }
     }
   } catch(e) {}
 
-  // 2. 尝试读取旧版持仓 (如果有)
+  // 2. 加密货币持仓 (V2~V14 myCryptoQty)
   try {
-    const oldQ = localStorage.getItem('myCryptoQty'); // V2
+    const oldQ = localStorage.getItem('myCryptoQty');
     if (oldQ) {
         const qObj = JSON.parse(oldQ);
-        // 合并持仓
-        for(let k in qObj) { if(!quantities[k]) quantities[k] = qObj[k]; }
+        for(let k in qObj) { 
+            if(!quantities[k]) quantities[k] = qObj[k]; 
+            // 确保币种在配置里
+            const sym = k.toUpperCase();
+            if(!cryptoConfig.find(c=>c.symbol===sym) && sym !== 'USDT') {
+                cryptoConfig.push({symbol:sym, wsKey:sym.toLowerCase()+'usdt'});
+            }
+        }
         foundCount++;
     }
   } catch(e) {}
 
-  // 3. 结算
+  // 3. ★ 新增: 美股持仓 (V2~V14 myStockQty)
+  try {
+    const oldS = localStorage.getItem('myStockQty');
+    if (oldS) {
+        const sObj = JSON.parse(oldS);
+        for(let k in sObj) { 
+            if(!quantities[k]) quantities[k] = sObj[k];
+            // 确保美股在配置里
+            const sym = k.toUpperCase();
+            if(!stockConfig.find(s=>s.symbol===sym) && sym !== 'USD') {
+                stockConfig.push({symbol:sym});
+            }
+        }
+        foundCount++;
+    }
+  } catch(e) {}
+
+  // 4. 结算
   if (foundCount > 0) {
-    if (!isAuto) alert(`成功找回本地旧数据！\n\n系统将立即同步到云端，请稍候...`);
-    else console.log("自动找回本地数据，准备上传...");
+    if (!isAuto) alert(`成功找回本地旧数据 (含美股)！\n\n系统将立即同步到云端。`);
+    else console.log("自动找回本地数据，上传中...");
     
     refreshCharts();
     renderUI();
-    // 强制触发一次手动保存（最高优先级），把找回的数据写回云端
-    saveToCloud(true); 
+    saveToCloud(true); // 强制保存
   } else {
-    if (!isAuto) alert("未在本地找到可恢复的旧版数据。");
+    if (!isAuto) alert("本地未发现可恢复的旧版数据。");
   }
 }
 
@@ -241,20 +262,15 @@ async function saveToCloud(isManual = false) {
   if (!isManual && !isDataComplete()) return;
 
   try {
-    // Check version
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     if (!res.ok) throw new Error("Check failed");
     const json = await res.json();
     const cloudVersion = json.record.version || 0;
 
-    // 如果不是手动强制保存（例如抢救数据），则遵守版本锁
     if (!isManual && cloudVersion !== dataVersion) {
-      console.warn("版本冲突，拉取最新...");
+      console.warn("版本冲突，同步云端...");
       processCloudData(json.record); renderUI(); refreshCharts(); return; 
     }
-    // 如果是手动保存（isManual=true），我们认为用户的当前操作（或抢救操作）是权威的
-    // 但为了安全，如果发现版本落后，最好还是只 update 内容，版本号以此为基准+1
-    // 这里简化：直接覆盖，版本号+1
 
     const now = Date.now();
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
