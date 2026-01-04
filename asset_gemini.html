@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v29 - 个人资产看板 (强制合并版)</title>
+  <title>v30 - 个人资产看板 (云端原生版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 样式部分保持不变 */
+    /* 保持 V29 的所有样式，未做改动 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
@@ -57,13 +57,12 @@
     .add-input-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; }
     .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; white-space: nowrap; }
     .btn-reset { background:#475569; color:#fff; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; margin-top:10px; font-size: 1rem; }
-    .btn-recover { background:transparent; border:1px dashed var(--accent-blue); color:var(--accent-blue); margin-top: 10px; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>资产看板 v29</h1>
+    <h1>资产看板 v30</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值 (实时)</small>
@@ -123,12 +122,13 @@
       </div>
 
       <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
-      <button class="btn-reset btn-recover" onclick="recoverFromLocal()">🛠️ 强制合并本地数据 (解决数据丢失)</button>
     </div>
   </div>
 
 <script>
-// 1. 配置
+/*************************************************************
+ * 1. 云端配置 (Cloud Only)
+ *************************************************************/
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
@@ -140,109 +140,47 @@ let isDataLoaded = false;
 let cryptoConfig = [], stockConfig = [], quantities = {};
 let dataVersion = 0; 
 
+// 状态变量
 let prices = {}, changes = {}, prevCloses = {}, hourlyComb = [];
 let binanceWS = null, finnhubWS = null, chartLine, chartPie, saveTimer = null;
 const $el = (id) => document.getElementById(id);
 function safeClassAdd(id, cls) { const el = $el(id); if(el) el.classList.add(cls); }
 function safeClassRemove(id, cls) { const el = $el(id); if(el) el.classList.remove(cls); }
 
-// 2. 加载
+/*************************************************************
+ * 2. 纯云端加载 (No Local Storage)
+ *************************************************************/
 async function loadConfig() {
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
-    if (!res.ok) throw new Error("连接失败");
+    if (!res.ok) throw new Error("连接失败: " + res.status);
     const json = await res.json();
     processCloudData(json.record);
 
     isDataLoaded = true;
-    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
-
-    // ★★★ V29 启动时强制执行一次智能合并 ★★★
-    // 不管云端有没有数据，都检查一遍本地有没有“遗珠”
-    setTimeout(() => recoverFromLocal(true), 1000);
+    renderUI(); 
+    initCharts(); 
+    startBinanceWS(); 
+    initStockDataAndWS(); 
+    refreshCharts(); // 初始渲染图表
 
   } catch (err) {
     console.error(err);
-    alert('离线模式: ' + err.message);
-    processCloudData({}); 
-    isDataLoaded = true;
-    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
-  }
-}
-
-// ★★★ 核心修复: 智能合并 (Merge Logic) ★★★
-function recoverFromLocal(isAuto = false) {
-  let hasChanges = false;
-  
-  // 1. 扫描加密货币旧持仓
-  try {
-    const oldQ = localStorage.getItem('myCryptoQty'); // V2版 Key
-    if (oldQ) {
-        const qObj = JSON.parse(oldQ);
-        for(let k in qObj) { 
-            const oldVal = parseFloat(qObj[k]) || 0;
-            const curVal = quantities[k] || 0;
-            // 如果本地有，云端没有(或为0)，则合并
-            if (oldVal > 0 && curVal === 0) {
-                quantities[k] = oldVal;
-                // 确保配置存在
-                const sym = k.toUpperCase();
-                if(!cryptoConfig.find(c=>c.symbol===sym) && sym !== 'USDT') {
-                    cryptoConfig.push({symbol:sym, wsKey:sym.toLowerCase()+'usdt'});
-                }
-                hasChanges = true;
-                console.log(`已找回 Crypto: ${sym} = ${oldVal}`);
-            }
-        }
-    }
-  } catch(e) {}
-
-  // 2. 扫描美股旧持仓 (V2版 Key)
-  try {
-    const oldS = localStorage.getItem('myStockQty');
-    if (oldS) {
-        const sObj = JSON.parse(oldS);
-        for(let k in sObj) { 
-            const oldVal = parseFloat(sObj[k]) || 0;
-            const curVal = quantities[k] || 0;
-            if (oldVal > 0 && curVal === 0) {
-                quantities[k] = oldVal;
-                const sym = k.toUpperCase();
-                // 如果是 USD，它是固定资产，可能不在 Config 列表显示但需要计算
-                // 如果是股票，检查 Config
-                if (sym !== 'USD' && !stockConfig.find(s=>s.symbol===sym)) {
-                    stockConfig.push({symbol:sym});
-                }
-                hasChanges = true;
-                console.log(`已找回 Stock: ${sym} = ${oldVal}`);
-            }
-        }
-    }
-  } catch(e) {}
-
-  // 3. 结算
-  if (hasChanges) {
-    if (!isAuto) alert(`成功合并本地遗漏数据！\n\n数据正在同步到云端...`);
-    else console.log("自动合并本地遗漏数据...");
-    
-    refreshCharts();
-    renderUI();
-    saveToCloud(true); // 强制上传新合并的数据
-    
-    // 如果加了新配置，需要重启服务订阅行情
-    startBinanceWS();
-    initStockDataAndWS();
-  } else {
-    if (!isAuto) alert("本地没有发现比云端更新的遗漏数据。");
+    alert('⚠️ 无法连接云端，请检查网络。\n(' + err.message + ')');
+    // 这里不再加载默认数据，而是停留在空状态或重试，避免产生版本冲突
   }
 }
 
 function processCloudData(data) {
+  // 读取版本号
   dataVersion = data.version || 0; 
+  console.log("云端数据版本:", dataVersion);
+
   cryptoConfig = (data.cryptoConfig?.length) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
   stockConfig  = (data.stockConfig?.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
   quantities   = data.quantities || {};
 
+  // 历史数据解压
   let rawHistory = data.hourlyComb || [];
   if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) {
     hourlyComb = rawHistory.map(item => ({ x: formatTs(item[0]), y: item[1] }));
@@ -250,6 +188,7 @@ function processCloudData(data) {
     hourlyComb = rawHistory;
   }
 
+  // 初始化价格字典
   [...cryptoConfig, ...stockConfig].forEach(item => {
     const k = item.symbol.toLowerCase();
     if (quantities[k] === undefined) quantities[k] = 0;
@@ -258,27 +197,38 @@ function processCloudData(data) {
   });
 }
 
-// 3. 安全保存
+/*************************************************************
+ * 3. 纯云端保存 (Version Control)
+ *************************************************************/
 async function saveToCloud(isManual = false) {
   if (!isDataLoaded) return;
+  // 自动保存时，必须数据完整才提交，防止污染历史
   if (!isManual && !isDataComplete()) return;
 
   try {
+    // A. 检查云端版本
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
-    if (!res.ok) throw new Error("Check failed");
+    if (!res.ok) throw new Error("Ver Check Failed");
     const json = await res.json();
     const cloudVersion = json.record.version || 0;
 
-    if (!isManual && cloudVersion !== dataVersion) {
-      console.warn("版本冲突，同步云端...");
-      processCloudData(json.record); renderUI(); refreshCharts(); return; 
+    // B. 冲突处理：云端更新 -> 同步到本地
+    if (cloudVersion !== dataVersion) {
+      console.warn("版本冲突，自动同步云端...");
+      alert("☁️ 发现云端有更新，页面将自动刷新以同步最新数据。");
+      processCloudData(json.record); 
+      renderUI(); 
+      refreshCharts(); 
+      return; // 终止本次保存，以云端为准
     }
 
+    // C. 准备数据
     const now = Date.now();
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const optimizedHistory = [];
     const seenDays = new Set();
 
+    // 历史数据优化策略
     for (let i = hourlyComb.length - 1; i >= 0; i--) {
       const point = hourlyComb[i];
       const ts = new Date(point.x).getTime();
@@ -294,9 +244,13 @@ async function saveToCloud(isManual = false) {
       }
     }
 
-    const nextVersion = (cloudVersion > dataVersion ? cloudVersion : dataVersion) + 1;
-    const payload = { version: nextVersion, cryptoConfig, stockConfig, quantities, hourlyComb: optimizedHistory };
+    const nextVersion = dataVersion + 1;
+    const payload = { 
+        version: nextVersion, 
+        cryptoConfig, stockConfig, quantities, hourlyComb: optimizedHistory 
+    };
 
+    // D. 提交
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
@@ -304,9 +258,9 @@ async function saveToCloud(isManual = false) {
     });
 
     dataVersion = nextVersion;
-    console.log(`Saved v${dataVersion}`);
+    console.log(`Cloud Save OK: v${dataVersion}`);
 
-  } catch(e) { console.error('Save failed', e); }
+  } catch(e) { console.error('Cloud Save Error', e); }
 }
 
 function isDataComplete() {
@@ -332,7 +286,9 @@ function formatTs(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
 }
 
-// 4. UI 逻辑
+/*************************************************************
+ * 4. UI 渲染
+ *************************************************************/
 function renderUI() {
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
@@ -433,9 +389,9 @@ function addStockAsset() {
   $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS();
 }
 function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
-function resetToDefault() { if(confirm('确定重置？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
+function resetToDefault() { if(confirm('重置将清空所有数据，确定吗？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
 
-// 6. Services & Charts
+// 6. Services
 function startBinanceWS() {
   if(binanceWS) binanceWS.close();
   const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
@@ -470,6 +426,7 @@ async function initStockDataAndWS() {
   finnhubWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); if (msg.type === 'trade' && msg.data) { msg.data.forEach(t => { const k = t.s.toLowerCase(); if (prices[k] !== undefined) { prices[k] = t.p; recalc(); } }); } } catch(e) {} };
 }
 
+// 7. Charts
 function initCharts() {
   if(chartLine) chartLine.destroy(); if(chartPie) chartPie.destroy();
   chartLine = new Chart($el('chartHourComb').getContext('2d'), { type: 'line', data: { datasets: [{ label: '总资产', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } } });
