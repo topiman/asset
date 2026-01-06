@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v30 - 个人资产看板 (云端原生版)</title>
+  <title>v31 - 个人资产看板 (隐私保护版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 保持 V29 的所有样式，未做改动 */
+    /* 保持 V30 基础样式 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
@@ -17,8 +17,13 @@
     .trend-flat { color: var(--text-secondary); opacity: 0.7; }
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
-    .header-controls { display:flex; align-items:center; gap:10px; }
+    .header-controls { display:flex; align-items:center; gap:12px; }
+    
+    /* 按钮样式优化 */
+    .btn-icon-only { background: transparent; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 5px; transition: color 0.2s; }
+    .btn-icon-only:hover { color: var(--accent-blue); }
     .btn-config { background:rgba(56, 189, 248, 0.1); border:1px solid var(--accent-blue); color:var(--accent-blue); padding:6px 12px; border-radius:6px; cursor:pointer; font-size: 0.9rem; }
+    
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
@@ -35,6 +40,11 @@
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
     .chart-box { position:relative; height:350px; }
     @media (max-width: 768px) { .col { min-width: 100%; } .chart-box { height: 250px; } }
+    
+    /* 隐私模式样式 - 模糊/隐藏 */
+    .privacy-hidden { filter: blur(4px); user-select: none; opacity: 0.6; }
+
+    /* Modal */
     .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; }
     @media (min-width: 769px) { .modal-overlay { align-items: center; } }
     .modal-content { background:var(--bg-card); width:95%; max-width:550px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
@@ -62,12 +72,15 @@
 <body>
 
   <header>
-    <h1>资产看板 v30</h1>
+    <h1>资产看板 v31</h1>
     <div class="header-controls">
       <div class="total-worth-display">
-        <small style="color:var(--text-secondary)">总净值 (实时)</small>
+        <small style="color:var(--text-secondary)">总净值</small>
         <span id="headerTotal">--</span>
       </div>
+      <button class="btn-icon-only" onclick="togglePrivacy()" id="btnPrivacy" title="隐私模式">
+        <i class="fas fa-eye"></i>
+      </button>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i></button>
     </div>
   </header>
@@ -100,7 +113,6 @@
   <div class="modal-overlay" id="configModal">
     <div class="modal-content">
       <div class="modal-header"><h2>资产配置 & 持仓</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
-      
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">加密货币</h4>
         <ul id="cryptoConfigList" class="config-list"></ul>
@@ -110,7 +122,6 @@
           <button class="btn-add" onclick="addCryptoAsset()">+</button>
         </div>
       </div>
-
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">美股/现金</h4>
         <ul id="stockConfigList" class="config-list"></ul>
@@ -120,15 +131,12 @@
           <button class="btn-add" onclick="addStockAsset()">+</button>
         </div>
       </div>
-
       <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
     </div>
   </div>
 
 <script>
-/*************************************************************
- * 1. 云端配置 (Cloud Only)
- *************************************************************/
+// 1. 配置
 const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
 const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
@@ -139,18 +147,19 @@ const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD',
 let isDataLoaded = false;
 let cryptoConfig = [], stockConfig = [], quantities = {};
 let dataVersion = 0; 
-
-// 状态变量
 let prices = {}, changes = {}, prevCloses = {}, hourlyComb = [];
 let binanceWS = null, finnhubWS = null, chartLine, chartPie, saveTimer = null;
+
+// ★ 隐私模式状态，默认 false，会尝试从本地加载
+let isPrivacyMode = localStorage.getItem('privacyMode') === 'true';
+
 const $el = (id) => document.getElementById(id);
 function safeClassAdd(id, cls) { const el = $el(id); if(el) el.classList.add(cls); }
 function safeClassRemove(id, cls) { const el = $el(id); if(el) el.classList.remove(cls); }
 
-/*************************************************************
- * 2. 纯云端加载 (No Local Storage)
- *************************************************************/
+// 2. 加载
 async function loadConfig() {
+  updatePrivacyBtn(); // 初始化按钮状态
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     if (!res.ok) throw new Error("连接失败: " + res.status);
@@ -162,33 +171,23 @@ async function loadConfig() {
     initCharts(); 
     startBinanceWS(); 
     initStockDataAndWS(); 
-    refreshCharts(); // 初始渲染图表
+    refreshCharts(); 
 
   } catch (err) {
     console.error(err);
-    alert('⚠️ 无法连接云端，请检查网络。\n(' + err.message + ')');
-    // 这里不再加载默认数据，而是停留在空状态或重试，避免产生版本冲突
+    alert('离线模式: ' + err.message);
   }
 }
 
 function processCloudData(data) {
-  // 读取版本号
   dataVersion = data.version || 0; 
   console.log("云端数据版本:", dataVersion);
-
   cryptoConfig = (data.cryptoConfig?.length) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
   stockConfig  = (data.stockConfig?.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
   quantities   = data.quantities || {};
-
-  // 历史数据解压
   let rawHistory = data.hourlyComb || [];
-  if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) {
-    hourlyComb = rawHistory.map(item => ({ x: formatTs(item[0]), y: item[1] }));
-  } else {
-    hourlyComb = rawHistory;
-  }
-
-  // 初始化价格字典
+  if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) hourlyComb = rawHistory.map(item => ({ x: formatTs(item[0]), y: item[1] }));
+  else hourlyComb = rawHistory;
   [...cryptoConfig, ...stockConfig].forEach(item => {
     const k = item.symbol.toLowerCase();
     if (quantities[k] === undefined) quantities[k] = 0;
@@ -197,38 +196,49 @@ function processCloudData(data) {
   });
 }
 
-/*************************************************************
- * 3. 纯云端保存 (Version Control)
- *************************************************************/
+// ★★★ 隐私模式逻辑 ★★★
+function togglePrivacy() {
+  isPrivacyMode = !isPrivacyMode;
+  localStorage.setItem('privacyMode', isPrivacyMode);
+  updatePrivacyBtn();
+  recalc(); // 刷新所有数字
+  refreshCharts(); // 刷新图表 Tooltip/Axis
+}
+
+function updatePrivacyBtn() {
+  const btn = $el('btnPrivacy');
+  if(btn) {
+    btn.innerHTML = isPrivacyMode ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+    btn.style.color = isPrivacyMode ? 'var(--accent-red)' : 'var(--text-secondary)';
+  }
+}
+
+// 格式化数字：如果隐私模式开启，返回 '****'
+function formatNum(val, isCurrency = true) {
+  if (isPrivacyMode) return '****';
+  if (val === undefined || val === null) return '--';
+  if (isCurrency) return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+  return val; // 数量
+}
+
+// 3. 云端保存
 async function saveToCloud(isManual = false) {
   if (!isDataLoaded) return;
-  // 自动保存时，必须数据完整才提交，防止污染历史
   if (!isManual && !isDataComplete()) return;
-
   try {
-    // A. 检查云端版本
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     if (!res.ok) throw new Error("Ver Check Failed");
     const json = await res.json();
     const cloudVersion = json.record.version || 0;
-
-    // B. 冲突处理：云端更新 -> 同步到本地
     if (cloudVersion !== dataVersion) {
-      console.warn("版本冲突，自动同步云端...");
-      alert("☁️ 发现云端有更新，页面将自动刷新以同步最新数据。");
-      processCloudData(json.record); 
-      renderUI(); 
-      refreshCharts(); 
-      return; // 终止本次保存，以云端为准
+      console.warn("版本冲突，同步云端...");
+      alert("☁️ 发现云端更新，正在同步...");
+      processCloudData(json.record); renderUI(); refreshCharts(); return; 
     }
-
-    // C. 准备数据
     const now = Date.now();
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const optimizedHistory = [];
     const seenDays = new Set();
-
-    // 历史数据优化策略
     for (let i = hourlyComb.length - 1; i >= 0; i--) {
       const point = hourlyComb[i];
       const ts = new Date(point.x).getTime();
@@ -243,23 +253,15 @@ async function saveToCloud(isManual = false) {
         }
       }
     }
-
     const nextVersion = dataVersion + 1;
-    const payload = { 
-        version: nextVersion, 
-        cryptoConfig, stockConfig, quantities, hourlyComb: optimizedHistory 
-    };
-
-    // D. 提交
+    const payload = { version: nextVersion, cryptoConfig, stockConfig, quantities, hourlyComb: optimizedHistory };
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: JSON.stringify(payload)
     });
-
     dataVersion = nextVersion;
     console.log(`Cloud Save OK: v${dataVersion}`);
-
   } catch(e) { console.error('Cloud Save Error', e); }
 }
 
@@ -286,19 +288,17 @@ function formatTs(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
 }
 
-/*************************************************************
- * 4. UI 渲染
- *************************************************************/
+// 4. UI 渲染 (应用 formatNum)
 function renderUI() {
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
-    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
+    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k], false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
   const sTb = $el('stockTableBody'); sTb.innerHTML = '';
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
-    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${quantities[k]}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
+    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k], false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
   recalc();
 }
@@ -308,25 +308,27 @@ function recalc() {
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0; const v = p*q; cTotal += v;
+    // 价格不脱敏，数量和总值脱敏
     if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
-    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
-    if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q, false);
+    if($el(`v_${k}`)) $el(`v_${k}`).textContent = formatNum(v); // 使用 formatNum
     updateChangeCell($el(`chg_${k}`), changes[k], c.isStable);
   });
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
     const p = prices[k]||0; const q = quantities[k]||0; const v = p*q; sTotal += v;
     if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
-    if($el(`q_${k}`)) $el(`q_${k}`).textContent = q;
-    if($el(`v_${k}`)) $el(`v_${k}`).textContent = v.toFixed(2);
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q, false);
+    if($el(`v_${k}`)) $el(`v_${k}`).textContent = formatNum(v);
     let chgPct = 0;
     if (!s.isCash && p > 0 && prevCloses[k] > 0) chgPct = ((p - prevCloses[k]) / prevCloses[k]) * 100;
     updateChangeCell($el(`chg_${k}`), chgPct, s.isCash);
   });
   const all = cTotal + sTotal;
-  $el('cryptoTotalDisplay').textContent = cTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
-  $el('stockTotalDisplay').textContent = sTotal.toLocaleString('en-US',{style:'currency',currency:'USD'});
-  $el('headerTotal').textContent = all.toLocaleString('en-US',{style:'currency',currency:'USD'});
+  // 更新表头总值 (脱敏)
+  $el('cryptoTotalDisplay').textContent = formatNum(cTotal);
+  $el('stockTotalDisplay').textContent = formatNum(sTotal);
+  $el('headerTotal').textContent = formatNum(all);
   
   checkHistory(all); 
   if(chartPie) refreshCharts(); 
@@ -391,7 +393,7 @@ function addStockAsset() {
 function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
 function resetToDefault() { if(confirm('重置将清空所有数据，确定吗？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
 
-// 6. Services
+// 6. Services & Charts
 function startBinanceWS() {
   if(binanceWS) binanceWS.close();
   const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
@@ -426,15 +428,51 @@ async function initStockDataAndWS() {
   finnhubWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); if (msg.type === 'trade' && msg.data) { msg.data.forEach(t => { const k = t.s.toLowerCase(); if (prices[k] !== undefined) { prices[k] = t.p; recalc(); } }); } } catch(e) {} };
 }
 
-// 7. Charts
 function initCharts() {
   if(chartLine) chartLine.destroy(); if(chartPie) chartPie.destroy();
-  chartLine = new Chart($el('chartHourComb').getContext('2d'), { type: 'line', data: { datasets: [{ label: '总资产', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { position: 'right' } } } });
-  chartPie = new Chart($el('chartAssetPie').getContext('2d'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } }, tooltip: { callbacks: { label: function(ctx) { const v = ctx.parsed; return `${ctx.label.split(' ')[0]}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`; } } } } } });
+  chartLine = new Chart($el('chartHourComb').getContext('2d'), { 
+    type: 'line', 
+    data: { datasets: [{ label: '总资产', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, 
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false, 
+      plugins: { legend: { display: false } }, 
+      scales: { 
+        x: { display: false }, 
+        y: { 
+          position: 'right',
+          // ★ 隐私模式：隐藏Y轴刻度文字
+          ticks: { callback: (v) => isPrivacyMode ? '' : v } 
+        } 
+      } 
+    } 
+  });
+  chartPie = new Chart($el('chartAssetPie').getContext('2d'), { 
+    type: 'doughnut', 
+    data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] }, 
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false, 
+      plugins: { 
+        legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } }, 
+        tooltip: { callbacks: { 
+          label: function(ctx) { 
+            // ★ 隐私模式：Tooltip 脱敏
+            const v = ctx.parsed; 
+            const label = ctx.label.split(' ')[0];
+            return isPrivacyMode ? `${label}: ****` : `${label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`; 
+          } 
+        } } 
+      } 
+    } 
+  });
 }
 
 function refreshCharts() {
   if(!chartLine || !chartPie) return;
+  
+  // 更新图表配置以响应隐私模式
+  chartLine.options.scales.y.ticks.callback = (v) => isPrivacyMode ? '' : new Intl.NumberFormat('en-US', { notation: "compact" }).format(v);
   chartLine.data.datasets[0].data = hourlyComb; 
   chartLine.update();
 
@@ -448,13 +486,8 @@ function refreshCharts() {
 function checkHistory(total) {
   const d = new Date(); const pad = n => n<10?'0'+n:n;
   const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
-  
   if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
-    if (isDataComplete()) { 
-        hourlyComb.push({ x: label, y: total }); 
-        refreshCharts();
-        saveToCloud(false); 
-    }
+    if (isDataComplete()) { hourlyComb.push({ x: label, y: total }); refreshCharts(); saveToCloud(false); }
   }
 }
 
