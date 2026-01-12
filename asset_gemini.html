@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v37 - 个人资产看板 (无损历史记录版)</title>
+  <title>v37 - 个人资产看板 (资产变动审计版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -61,6 +61,7 @@
     .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; white-space: nowrap; }
     .btn-reset { background:#475569; color:#fff; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; margin-top:10px; font-size: 1rem; }
     .btn-logout { background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); margin-top: 20px; }
+    
     #loginModal .modal-content { max-width: 400px; text-align: center; }
     .login-input { width: 100%; padding: 12px; margin: 20px 0; background: #0f172a; border: 1px solid var(--accent-blue); color: white; border-radius: 6px; font-size: 1.1rem; text-align: center; }
     .btn-login { width: 100%; padding: 12px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
@@ -233,13 +234,14 @@ function processCloudData(data) {
   });
 }
 
-// 3. 云端保存 (V37修改: 无损保存所有历史)
+// 3. 云端保存 (带 logChange 逻辑)
+// isManual = true: 手动修改 (如改持仓) -> 触发记账
+// isManual = false: 自动保存 (如记录历史) -> 不记账
 async function saveToCloud(isManual = false) {
   if (!isDataLoaded) return;
   if (!isManual && !isDataComplete()) return;
 
   try {
-    // 检查版本
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?token=${currentToken}`);
     if (!res.ok) throw new Error("Ver Check Failed");
     const json = await res.json();
@@ -258,8 +260,7 @@ async function saveToCloud(isManual = false) {
       }
     }
 
-    // ★★★ V37 核心修改：不再进行压缩，全量保存 ★★★
-    // 直接将内存中的 hourlyComb (包含 {x, y}) 转换为后端需要的 [[ts, val]] 格式
+    // 全量历史 (无损)
     const fullHistory = hourlyComb.map(pt => {
         const ts = new Date(pt.x).getTime();
         return [ts, Math.round(pt.y)];
@@ -269,7 +270,8 @@ async function saveToCloud(isManual = false) {
     const payload = { 
       token: currentToken, 
       version: nextVersion, cryptoConfig, stockConfig, quantities, 
-      hourlyComb: fullHistory // 发送完整历史
+      hourlyComb: fullHistory,
+      logChange: isManual // ★ 告诉后端：这次操作需要记录到 AssetLog
     };
 
     await fetch(GOOGLE_SCRIPT_URL, {
@@ -278,12 +280,70 @@ async function saveToCloud(isManual = false) {
     });
 
     dataVersion = nextVersion;
-    console.log(`Saved v${dataVersion} (Points: ${fullHistory.length})`);
+    console.log(`Saved v${dataVersion} (Log: ${isManual})`);
 
   } catch(e) { console.error('Save failed', e); }
 }
 
-// 通用函数
+// 4. Modal 操作逻辑 (修改时调用 saveToCloud(true))
+function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
+function closeConfigModal() { $el('configModal').style.display = 'none'; }
+function renderConfigList() { renderCryptoList(); renderStockList(); }
+function renderCryptoList() {
+  const list = $el('cryptoConfigList'); list.innerHTML = '';
+  cryptoConfig.forEach((item, idx) => {
+    const k = item.symbol.toLowerCase();
+    const isFixed = (item.symbol === 'USDT');
+    const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('crypto', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
+    const btnDown = idx < cryptoConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('crypto', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
+    const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeCrypto(${idx})"></i>` : `<span style="width:24px"></span>`;
+    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
+  });
+}
+function renderStockList() {
+  const list = $el('stockConfigList'); list.innerHTML = '';
+  stockConfig.forEach((item, idx) => {
+    const k = item.symbol.toLowerCase();
+    const isFixed = (item.symbol === 'USD');
+    const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('stock', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
+    const btnDown = idx < stockConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('stock', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
+    const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeStock(${idx})"></i>` : `<span style="width:24px"></span>`;
+    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
+  });
+}
+window.moveAsset = function(type, idx, dir) {
+  const arr = (type === 'crypto') ? cryptoConfig : stockConfig;
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= arr.length) return;
+  [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+  renderConfigList(); renderUI(); 
+  saveToCloud(true); // 手动操作
+  if (type === 'crypto') startBinanceWS(); else initStockDataAndWS();
+};
+window.updateQty = function(key, val) { 
+  quantities[key] = parseFloat(val) || 0; 
+  recalc(); 
+  // 防抖保存，但也算手动操作
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveToCloud(true), 2000); 
+};
+function addCryptoAsset() {
+  const sym = $el('newCryptoSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newCryptoQty').value)||0;
+  if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) return alert('已存在');
+  cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' }); quantities[sym.toLowerCase()] = qty;
+  $el('newCryptoSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS();
+}
+function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS(); }
+function addStockAsset() {
+  const sym = $el('newStockSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newStockQty').value)||0;
+  if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) return alert('已存在');
+  stockConfig.push({ symbol: sym }); quantities[sym.toLowerCase()] = qty;
+  $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS();
+}
+function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
+function resetToDefault() { if(confirm('确定重置？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
+
+// 5. 通用逻辑
 function togglePrivacy() { isPrivacyMode = !isPrivacyMode; localStorage.setItem('privacyMode', isPrivacyMode); updatePrivacyBtn(); recalc(); refreshCharts(); }
 function updatePrivacyBtn() { const btn = $el('btnPrivacy'); if(btn) { btn.innerHTML = isPrivacyMode ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>'; btn.style.color = isPrivacyMode ? 'var(--accent-red)' : 'var(--text-secondary)'; } }
 function formatNum(val, isCurrency = true) { if (isPrivacyMode) return '****'; if (val === undefined || val === null) return '--'; if (isCurrency) return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val); return val; }
@@ -293,7 +353,6 @@ function isDataComplete() {
   for (let s of stockConfig) { const k = s.symbol.toLowerCase(); if (quantities[k] > 0 && !s.isCash && prices[k] <= 0) return false; }
   return true;
 }
-function debounceSave() { if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(() => saveToCloud(true), 2000); }
 function formatTs(ts) { const d = new Date(ts); const pad = n => n<10?'0'+n:n; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`; }
 
 function renderUI() {
@@ -312,19 +371,6 @@ function recalc() {
   checkHistory(all); if(chartPie) refreshCharts(); 
 }
 function updateChangeCell(el, val, isStable) { if (!el) return; if (isStable) { el.textContent = '0.00%'; el.className = 'val-cell trend-flat'; return; } if (val > 0) { el.textContent = '+' + val.toFixed(2) + '%'; el.className = 'val-cell trend-up'; } else if (val < 0) { el.textContent = val.toFixed(2) + '%'; el.className = 'val-cell trend-down'; } else { el.textContent = '0.00%'; el.className = 'val-cell trend-flat'; } }
-
-function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
-function closeConfigModal() { $el('configModal').style.display = 'none'; }
-function renderConfigList() { renderCryptoList(); renderStockList(); }
-function renderCryptoList() { const list = $el('cryptoConfigList'); list.innerHTML = ''; cryptoConfig.forEach((item, idx) => { const k = item.symbol.toLowerCase(); const isFixed = (item.symbol === 'USDT'); const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('crypto', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`; const btnDown = idx < cryptoConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('crypto', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`; const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeCrypto(${idx})"></i>` : `<span style="width:24px"></span>`; list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`); }); }
-function renderStockList() { const list = $el('stockConfigList'); list.innerHTML = ''; stockConfig.forEach((item, idx) => { const k = item.symbol.toLowerCase(); const isFixed = (item.symbol === 'USD'); const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('stock', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`; const btnDown = idx < stockConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('stock', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`; const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeStock(${idx})"></i>` : `<span style="width:24px"></span>`; list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`); }); }
-window.moveAsset = function(type, idx, dir) { const arr = (type === 'crypto') ? cryptoConfig : stockConfig; const targetIdx = idx + dir; if (targetIdx < 0 || targetIdx >= arr.length) return; [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]; renderConfigList(); renderUI(); saveToCloud(true); if (type === 'crypto') startBinanceWS(); else initStockDataAndWS(); };
-window.updateQty = function(key, val) { quantities[key] = parseFloat(val) || 0; recalc(); debounceSave(); };
-function addCryptoAsset() { const sym = $el('newCryptoSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newCryptoQty').value)||0; if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) return alert('已存在'); cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' }); quantities[sym.toLowerCase()] = qty; $el('newCryptoSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS(); }
-function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS(); }
-function addStockAsset() { const sym = $el('newStockSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newStockQty').value)||0; if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) return alert('已存在'); stockConfig.push({ symbol: sym }); quantities[sym.toLowerCase()] = qty; $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
-function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
-function resetToDefault() { if(confirm('确定重置？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
 
 function startBinanceWS() { if(binanceWS) binanceWS.close(); const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/'); if(streams) { binanceWS = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams); binanceWS.onopen = () => { safeClassAdd('wsBinanceDot', 'active'); }; binanceWS.onclose = () => { safeClassRemove('wsBinanceDot', 'active'); setTimeout(startBinanceWS, 5000); }; binanceWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); const symbol = cryptoConfig.find(c => c.wsKey && msg.stream.includes(c.wsKey)); if(symbol) { const k = symbol.symbol.toLowerCase(); prices[k] = parseFloat(msg.data.c); changes[k] = parseFloat(msg.data.P); recalc(); } } catch(e){} }; } }
 async function initStockDataAndWS() { safeClassRemove('wsFinnhubDot', 'active'); const symbols = stockConfig.filter(s => !s.isCash).map(s => s.symbol); if(symbols.length === 0) return; const promises = symbols.map(sym => fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_TOKEN}`).then(r=>r.json()).then(d=>({s:sym, p:d.c, pc:d.pc})).catch(()=>null)); (await Promise.all(promises)).forEach(r => { if(r && r.p) { const k = r.s.toLowerCase(); prices[k] = r.p; prevCloses[k] = r.pc; } }); safeClassAdd('wsFinnhubDot', 'active'); recalc(); if(finnhubWS) finnhubWS.close(); finnhubWS = new WebSocket(`wss://ws.finnhub.io?token=${FINNHUB_TOKEN}`); finnhubWS.onopen = () => { safeClassAdd('wsFinnhubDot', 'active'); symbols.forEach(sym => finnhubWS.send(JSON.stringify({ type: 'subscribe', symbol: sym }))); }; finnhubWS.onclose = () => { safeClassRemove('wsFinnhubDot', 'active'); setTimeout(() => initStockDataAndWS(), 5000); }; finnhubWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); if (msg.type === 'trade' && msg.data) { msg.data.forEach(t => { const k = t.s.toLowerCase(); if (prices[k] !== undefined) { prices[k] = t.p; recalc(); } }); } } catch(e) {} }; }
