@@ -3,84 +3,88 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>v31 - 个人资产看板 (隐私保护版)</title>
+  <title>个人资产看板 (Google表格结构化版)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <style>
-    /* 保持 V30 基础样式 */
     :root { --bg-body:#0f172a; --bg-card:#1e293b; --text-primary:#f1f5f9; --text-secondary:#94a3b8; --accent-blue:#38bdf8; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#475569; }
     body { margin:0; background:var(--bg-body); color:var(--text-primary); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     * { box-sizing: border-box; }
-    .trend-up { color: var(--accent-green); font-weight: 700; }
-    .trend-down { color: var(--accent-red); font-weight: 700; }
-    .trend-flat { color: var(--text-secondary); opacity: 0.7; }
+    
+    /* 布局与组件 */
     header { background:var(--bg-card); padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
     header h1 { margin:0; font-size:1.2rem; color:var(--accent-blue); font-weight: 700; }
     .header-controls { display:flex; align-items:center; gap:12px; }
-    
-    /* 按钮样式优化 */
-    .btn-icon-only { background: transparent; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 5px; transition: color 0.2s; }
-    .btn-icon-only:hover { color: var(--accent-blue); }
+    .btn-icon-only { background: transparent; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 5px; }
     .btn-config { background:rgba(56, 189, 248, 0.1); border:1px solid var(--accent-blue); color:var(--accent-blue); padding:6px 12px; border-radius:6px; cursor:pointer; font-size: 0.9rem; }
-    
     .total-worth-display { font-size: 0.9rem; text-align: right; }
     .total-worth-display span { display: block; color:var(--accent-green); font-weight:bold; font-size:1.1rem; }
+    
     .container { width:100%; max-width:1400px; margin:0 auto; padding: 15px; }
     .row { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
     .col { background:var(--bg-card); border-radius:12px; padding:15px; flex:1; min-width:300px; border:1px solid var(--border-color); }
-    h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    h3.panel-title { margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; color:var(--text-secondary); font-size: 1rem; }
+    
+    /* 表格 */
     table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top: 10px; }
     th, td { padding:10px 4px; border-bottom:1px solid var(--border-color); text-align:left; }
     th { color:var(--text-secondary); font-weight: normal; font-size: 0.8rem; }
     .val-cell { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
+    .trend-up { color: var(--accent-green); font-weight: bold; }
+    .trend-down { color: var(--accent-red); font-weight: bold; }
+    .trend-flat { color: var(--text-secondary); }
+
+    /* 状态栏 */
     .status-bar { margin-top:10px; font-size:0.75rem; color:var(--text-secondary); text-align:right; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-    .status-item { display: flex; align-items: center; gap: 4px; }
     .status-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; transition: background 0.3s; }
     .status-dot.active { background:#22c55e; box-shadow:0 0 5px #22c55e; }
+    
     .chart-box { position:relative; height:350px; }
     @media (max-width: 768px) { .col { min-width: 100%; } .chart-box { height: 250px; } }
-    
-    /* 隐私模式样式 - 模糊/隐藏 */
-    .privacy-hidden { filter: blur(4px); user-select: none; opacity: 0.6; }
 
-    /* Modal */
-    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:flex-end; }
-    @media (min-width: 769px) { .modal-overlay { align-items: center; } }
-    .modal-content { background:var(--bg-card); width:95%; max-width:550px; max-height:85vh; border-radius:12px 12px 0 0; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
-    @media (min-width: 769px) { .modal-content { border-radius: 12px; margin-bottom: auto; } }
+    /* 弹窗通用 */
+    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; justify-content:center; align-items:center; }
+    .modal-content { background:var(--bg-card); width:90%; max-width:500px; max-height:85vh; border-radius:12px; padding:20px; display:flex; flex-direction:column; overflow-y:auto; border:1px solid var(--border-color); }
     .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
     .close-modal { cursor:pointer; font-size:1.5rem; color:var(--text-secondary); padding: 5px; }
-    .config-section { margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid var(--border-color); }
+    
+    /* 配置列表 */
     .config-list { list-style:none; padding:0; margin:0; }
     .config-item { display:flex; align-items:center; background:rgba(255,255,255,0.05); margin-bottom:8px; padding:8px 12px; border-radius:6px; gap: 8px; }
     .config-symbol { flex: 1; font-weight: bold; font-size: 0.95rem; }
     .config-qty { width: 90px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:6px; border-radius:4px; font-size: 15px; text-align: right; }
     .action-group { display: flex; gap: 2px; }
-    .btn-icon { color:var(--text-secondary); cursor:pointer; padding: 6px; border-radius: 4px; transition: 0.2s; }
+    .btn-icon { color:var(--text-secondary); cursor:pointer; padding: 6px; border-radius: 4px; }
     .btn-icon:hover { background: rgba(255,255,255,0.1); color: white; }
     .btn-delete { color:var(--accent-red); }
-    .btn-delete:hover { background: rgba(248, 113, 113, 0.2); }
-    .btn-disabled { opacity: 0.2; cursor: default; }
+    
     .add-row { display:flex; gap:10px; margin-top:10px; }
     .add-input-sym { flex:1; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; text-transform: uppercase; }
     .add-input-qty { width: 100px; background:#0f172a; border:1px solid var(--border-color); color:white; padding:10px; border-radius:6px; font-size: 16px; }
     .btn-add { background:var(--accent-green); color:#000; border:none; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; white-space: nowrap; }
     .btn-reset { background:#475569; color:#fff; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; margin-top:10px; font-size: 1rem; }
+    .btn-logout { background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); margin-top: 20px; }
+
+    /* 登录框 */
+    #loginModal .modal-content { max-width: 400px; text-align: center; }
+    .login-input { width: 100%; padding: 12px; margin: 20px 0; background: #0f172a; border: 1px solid var(--accent-blue); color: white; border-radius: 6px; font-size: 1.1rem; text-align: center; }
+    .btn-login { width: 100%; padding: 12px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
+    
+    /* 隐私模糊 */
+    .privacy-hidden { filter: blur(4px); user-select: none; opacity: 0.6; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>资产看板 v31</h1>
+    <h1>资产看板 (表格版)</h1>
     <div class="header-controls">
       <div class="total-worth-display">
         <small style="color:var(--text-secondary)">总净值</small>
         <span id="headerTotal">--</span>
       </div>
-      <button class="btn-icon-only" onclick="togglePrivacy()" id="btnPrivacy" title="隐私模式">
-        <i class="fas fa-eye"></i>
-      </button>
+      <button class="btn-icon-only" onclick="togglePrivacy()" id="btnPrivacy"><i class="fas fa-eye"></i></button>
       <button class="btn-config" onclick="openConfigModal()"><i class="fas fa-cog"></i></button>
     </div>
   </header>
@@ -93,7 +97,7 @@
           <thead><tr><th>资产</th><th>价格</th><th style="text-align:right">24h%</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="cryptoTableBody"></tbody>
         </table>
-        <div class="status-bar"><div class="status-item"><span id="wsBinanceDot" class="status-dot"></span> Binance</div></div>
+        <div class="status-bar"><span id="wsBinanceDot" class="status-dot"></span> Binance</div>
       </div>
       <div class="col">
         <h3 class="panel-title">美股/现金 <small id="stockTotalDisplay" style="color:var(--accent-blue)">--</small></h3>
@@ -101,7 +105,7 @@
           <thead><tr><th>代码</th><th>价格</th><th style="text-align:right">24h%</th><th style="text-align:right">持仓</th><th style="text-align:right">价值</th></tr></thead>
           <tbody id="stockTableBody"></tbody>
         </table>
-        <div class="status-bar"><div class="status-item"><span id="wsFinnhubDot" class="status-dot"></span> Finnhub WS</div></div>
+        <div class="status-bar"><span id="wsFinnhubDot" class="status-dot"></span> Finnhub WS</div>
       </div>
     </div>
     <div class="row">
@@ -110,84 +114,138 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="loginModal" style="display: flex;">
+    <div class="modal-content">
+      <h2 style="color:var(--accent-blue); margin-top:0;">🔒 安全访问</h2>
+      <p style="color:var(--text-secondary)">请输入 Google Script 配置的访问密码</p>
+      <input type="password" id="inputToken" class="login-input" placeholder="Password">
+      <button class="btn-login" onclick="doLogin()">进入看板</button>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="configModal">
     <div class="modal-content">
-      <div class="modal-header"><h2>资产配置 & 持仓</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
+      <div class="modal-header"><h2>资产配置</h2><span class="close-modal" onclick="closeConfigModal()">&times;</span></div>
+      
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">加密货币</h4>
         <ul id="cryptoConfigList" class="config-list"></ul>
         <div class="add-row">
-          <input type="text" class="add-input-sym" id="newCryptoSymbol" placeholder="如 BTC">
+          <input type="text" class="add-input-sym" id="newCryptoSymbol" placeholder="如 DOGE">
           <input type="number" class="add-input-qty" id="newCryptoQty" placeholder="数量">
           <button class="btn-add" onclick="addCryptoAsset()">+</button>
         </div>
       </div>
+
       <div class="config-section">
         <h4 style="color:var(--accent-blue)">美股/现金</h4>
         <ul id="stockConfigList" class="config-list"></ul>
         <div class="add-row">
-          <input type="text" class="add-input-sym" id="newStockSymbol" placeholder="如 TSLA">
+          <input type="text" class="add-input-sym" id="newStockSymbol" placeholder="如 AAPL">
           <input type="number" class="add-input-qty" id="newStockQty" placeholder="数量">
           <button class="btn-add" onclick="addStockAsset()">+</button>
         </div>
       </div>
-      <button class="btn-reset" onclick="resetToDefault()">重置所有数据</button>
+
+      <button class="btn-reset" onclick="resetToDefault()">🗑️ 清空所有配置</button>
+      <button class="btn-reset btn-logout" onclick="doLogout()">🔒 退出登录</button>
     </div>
   </div>
 
 <script>
-// 1. 配置
-const JSONBIN_ID  = "694a56ccae596e708fabeac2";       
-const JSONBIN_KEY = "$2a$10$ILS6zBz1bfayZ1p0fV2nw.aUVzyUXP6ZicSczS4LLMvPFuCDOY0JC";
+// ================= 配置区 =================
+// ★★★ 请替换为你的 Google Apps Script Web App URL ★★★
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxLBmqMYOZu6uACDHgspZEnHiFwnxufNBOxbltU0vGt_03CfYh9hdy6xxvc-KSH4XAK/exec"; 
 const FINNHUB_TOKEN = "cuhf9e9r01qva71tls00cuhf9e9r01qva71tls0g";
 
-const DEFAULT_CRYPTO = [ { symbol: 'BTC', wsKey: 'btcusdt' }, { symbol: 'ETH', wsKey: 'ethusdt' }, { symbol: 'SOL', wsKey: 'solusdt' }, { symbol: 'USDT', wsKey: null, isStable: true } ];
-const DEFAULT_STOCK = [ { symbol: 'TSLA' }, { symbol: 'NVDA' }, { symbol: 'USD', isCash: true } ];
+const DEFAULT_CRYPTO = [{symbol:'BTC',wsKey:'btcusdt'},{symbol:'ETH',wsKey:'ethusdt'},{symbol:'USDT',wsKey:null,isStable:true}];
+const DEFAULT_STOCK = [{symbol:'TSLA'},{symbol:'NVDA'},{symbol:'USD',isCash:true}];
 
+// ================= 状态变量 =================
 let isDataLoaded = false;
 let cryptoConfig = [], stockConfig = [], quantities = {};
 let dataVersion = 0; 
+let currentToken = "";
 let prices = {}, changes = {}, prevCloses = {}, hourlyComb = [];
 let binanceWS = null, finnhubWS = null, chartLine, chartPie, saveTimer = null;
-
-// ★ 隐私模式状态，默认 false，会尝试从本地加载
 let isPrivacyMode = localStorage.getItem('privacyMode') === 'true';
 
 const $el = (id) => document.getElementById(id);
 function safeClassAdd(id, cls) { const el = $el(id); if(el) el.classList.add(cls); }
 function safeClassRemove(id, cls) { const el = $el(id); if(el) el.classList.remove(cls); }
 
-// 2. 加载
-async function loadConfig() {
-  updatePrivacyBtn(); // 初始化按钮状态
+// ================= 1. 启动 & 登录 =================
+window.onload = function() {
+  updatePrivacyBtn();
+  if (GOOGLE_SCRIPT_URL.includes("XXXXXXXX")) { alert("请修改代码中的 GOOGLE_SCRIPT_URL"); return; }
+  
+  const stored = localStorage.getItem('app_token');
+  if(stored) {
+    currentToken = stored;
+    $el('loginModal').style.display = 'none';
+    fetchData();
+  } else {
+    $el('loginModal').style.display = 'flex';
+  }
+};
+
+function doLogin() {
+  const val = $el('inputToken').value.trim();
+  if(!val) return alert("请输入密码");
+  localStorage.setItem('app_token', val);
+  currentToken = val;
+  $el('loginModal').style.display = 'none';
+  fetchData();
+}
+
+function doLogout() {
+  localStorage.removeItem('app_token');
+  location.reload();
+}
+
+// ================= 2. 数据读写 (Google Sheets) =================
+async function fetchData() {
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
-    if (!res.ok) throw new Error("连接失败: " + res.status);
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?token=${currentToken}`);
+    if(!res.ok) throw new Error("连接失败: " + res.status);
     const json = await res.json();
-    processCloudData(json.record);
-
+    
+    if(json.status === 'error') {
+      alert("错误: " + json.message);
+      localStorage.removeItem('app_token');
+      location.reload();
+      return;
+    }
+    
+    processData(json.record || {});
+    
     isDataLoaded = true;
-    renderUI(); 
-    initCharts(); 
-    startBinanceWS(); 
-    initStockDataAndWS(); 
-    refreshCharts(); 
-
-  } catch (err) {
-    console.error(err);
-    alert('离线模式: ' + err.message);
+    renderUI(); initCharts(); startBinanceWS(); initStockDataAndWS(); refreshCharts();
+    
+  } catch(e) {
+    console.error(e);
+    alert("无法加载数据: " + e.message);
   }
 }
 
-function processCloudData(data) {
-  dataVersion = data.version || 0; 
-  console.log("云端数据版本:", dataVersion);
+function processData(data) {
+  dataVersion = data.version || 0;
+  console.log("云端数据版本: v" + dataVersion);
+  
   cryptoConfig = (data.cryptoConfig?.length) ? data.cryptoConfig : JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
-  stockConfig  = (data.stockConfig?.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
-  quantities   = data.quantities || {};
-  let rawHistory = data.hourlyComb || [];
-  if (rawHistory.length > 0 && Array.isArray(rawHistory[0])) hourlyComb = rawHistory.map(item => ({ x: formatTs(item[0]), y: item[1] }));
-  else hourlyComb = rawHistory;
+  stockConfig = (data.stockConfig?.length) ? data.stockConfig : JSON.parse(JSON.stringify(DEFAULT_STOCK));
+  quantities = data.quantities || {};
+  
+  // 处理历史数据：后端返回的是 [[ts, val], [ts, val]] 格式
+  let rawHist = data.hourlyComb || [];
+  // 转换成 Chart.js 需要的 {x, y} 格式供本地使用
+  if(rawHist.length > 0) {
+    hourlyComb = rawHist.map(pt => ({ x: formatTs(pt[0]), y: pt[1] }));
+  } else {
+    hourlyComb = [];
+  }
+
+  // 初始化价格表
   [...cryptoConfig, ...stockConfig].forEach(item => {
     const k = item.symbol.toLowerCase();
     if (quantities[k] === undefined) quantities[k] = 0;
@@ -196,302 +254,244 @@ function processCloudData(data) {
   });
 }
 
-// ★★★ 隐私模式逻辑 ★★★
-function togglePrivacy() {
-  isPrivacyMode = !isPrivacyMode;
-  localStorage.setItem('privacyMode', isPrivacyMode);
-  updatePrivacyBtn();
-  recalc(); // 刷新所有数字
-  refreshCharts(); // 刷新图表 Tooltip/Axis
-}
-
-function updatePrivacyBtn() {
-  const btn = $el('btnPrivacy');
-  if(btn) {
-    btn.innerHTML = isPrivacyMode ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
-    btn.style.color = isPrivacyMode ? 'var(--accent-red)' : 'var(--text-secondary)';
-  }
-}
-
-// 格式化数字：如果隐私模式开启，返回 '****'
-function formatNum(val, isCurrency = true) {
-  if (isPrivacyMode) return '****';
-  if (val === undefined || val === null) return '--';
-  if (isCurrency) return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
-  return val; // 数量
-}
-
-// 3. 云端保存
 async function saveToCloud(isManual = false) {
   if (!isDataLoaded) return;
   if (!isManual && !isDataComplete()) return;
+
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
-    if (!res.ok) throw new Error("Ver Check Failed");
+    // Check version
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?token=${currentToken}`);
     const json = await res.json();
-    const cloudVersion = json.record.version || 0;
-    if (cloudVersion !== dataVersion) {
-      console.warn("版本冲突，同步云端...");
-      alert("☁️ 发现云端更新，正在同步...");
-      processCloudData(json.record); renderUI(); refreshCharts(); return; 
-    }
-    const now = Date.now();
-    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-    const optimizedHistory = [];
-    const seenDays = new Set();
-    for (let i = hourlyComb.length - 1; i >= 0; i--) {
-      const point = hourlyComb[i];
-      const ts = new Date(point.x).getTime();
-      if (isNaN(ts)) continue;
-      if ((now - ts) < THIRTY_DAYS) {
-        optimizedHistory.unshift([ts, Math.round(point.y)]);
-      } else {
-        const dateStr = point.x.split(' ')[0];
-        if (!seenDays.has(dateStr)) {
-          optimizedHistory.unshift([ts, Math.round(point.y)]);
-          seenDays.add(dateStr);
-        }
+    const cloudVer = (json.record && json.record.version) || 0;
+    
+    if(cloudVer > dataVersion) {
+      if(isManual && !confirm("云端数据较新，确定覆盖吗？")) {
+        processData(json.record); renderUI(); refreshCharts(); return;
+      }
+      if(!isManual) {
+        console.log("自动同步取消：云端版本较新");
+        processData(json.record); renderUI(); refreshCharts(); return;
       }
     }
-    const nextVersion = dataVersion + 1;
-    const payload = { version: nextVersion, cryptoConfig, stockConfig, quantities, hourlyComb: optimizedHistory };
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+
+    // Prepare Data
+    const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 3600 * 1000;
+    const optHist = [];
+    const seenDays = new Set();
+    
+    // 压缩历史数据，格式化为 [ts, val] 发送给后端
+    for(let i=hourlyComb.length-1; i>=0; i--) {
+      const pt = hourlyComb[i];
+      const ts = new Date(pt.x).getTime();
+      if(isNaN(ts)) continue;
+      
+      const item = [ts, Math.round(pt.y)];
+      if ((now - ts) < THIRTY_DAYS) {
+        optHist.unshift(item);
+      } else {
+        const dStr = pt.x.split(' ')[0];
+        if(!seenDays.has(dStr)) { optHist.unshift(item); seenDays.add(dStr); }
+      }
+    }
+
+    const nextVer = dataVersion + 1;
+    const payload = {
+      token: currentToken,
+      version: nextVer,
+      cryptoConfig, stockConfig, quantities,
+      hourlyComb: optHist
+    };
+
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
       body: JSON.stringify(payload)
     });
-    dataVersion = nextVersion;
-    console.log(`Cloud Save OK: v${dataVersion}`);
-  } catch(e) { console.error('Cloud Save Error', e); }
+    
+    dataVersion = nextVer;
+    console.log("保存成功 v" + nextVer);
+
+  } catch(e) { console.error("保存失败", e); }
 }
 
+// ================= 3. 业务逻辑 =================
 function isDataComplete() {
-  for (let c of cryptoConfig) {
-    const k = c.symbol.toLowerCase();
-    if (quantities[k] > 0 && !c.isStable && prices[k] <= 0) return false;
-  }
-  for (let s of stockConfig) {
-    const k = s.symbol.toLowerCase();
-    if (quantities[k] > 0 && !s.isCash && prices[k] <= 0) return false;
-  }
+  for(let c of cryptoConfig) { if(quantities[c.symbol.toLowerCase()]>0 && !c.isStable && !prices[c.symbol.toLowerCase()]) return false; }
+  for(let s of stockConfig) { if(quantities[s.symbol.toLowerCase()]>0 && !s.isCash && !prices[s.symbol.toLowerCase()]) return false; }
   return true;
 }
-
-function debounceSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveToCloud(true), 2000);
+function debounceSave() { if(saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(() => saveToCloud(true), 2000); }
+function formatTs(ts) { 
+  const d = new Date(ts); 
+  const pad = n=>n<10?'0'+n:n; 
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`; 
 }
+function togglePrivacy() { isPrivacyMode = !isPrivacyMode; localStorage.setItem('privacyMode', isPrivacyMode); updatePrivacyBtn(); recalc(); refreshCharts(); }
+function updatePrivacyBtn() { $el('btnPrivacy').innerHTML = isPrivacyMode ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>'; $el('btnPrivacy').style.color = isPrivacyMode?'var(--accent-red)':'var(--text-secondary)'; }
+function formatNum(v, isCurrency=true) { if(isPrivacyMode) return '****'; if(v===undefined||v===null) return '--'; return isCurrency ? new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(v) : v; }
 
-function formatTs(ts) {
-  const d = new Date(ts);
-  const pad = n => n<10?'0'+n:n;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
-}
-
-// 4. UI 渲染 (应用 formatNum)
 function renderUI() {
   const cTb = $el('cryptoTableBody'); cTb.innerHTML = '';
   cryptoConfig.forEach(c => {
     const k = c.symbol.toLowerCase();
-    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k], false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
+    cTb.insertAdjacentHTML('beforeend', `<tr><td><b>${c.symbol}</b></td><td class="val-cell" id="p_${k}">--</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k],false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
   const sTb = $el('stockTableBody'); sTb.innerHTML = '';
   stockConfig.forEach(s => {
     const k = s.symbol.toLowerCase();
-    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k], false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
+    sTb.insertAdjacentHTML('beforeend', `<tr><td><b>${s.symbol}</b></td><td class="val-cell" id="p_${k}">${s.isCash?'1.00':'--'}</td><td class="val-cell" style="text-align:right" id="chg_${k}">--</td><td class="val-cell" style="text-align:right" id="q_${k}">${formatNum(quantities[k],false)}</td><td class="val-cell" style="text-align:right" id="v_${k}">--</td></tr>`);
   });
   recalc();
 }
 
 function recalc() {
-  let cTotal = 0, sTotal = 0;
-  cryptoConfig.forEach(c => {
-    const k = c.symbol.toLowerCase();
-    const p = prices[k]||0; const q = quantities[k]||0; const v = p*q; cTotal += v;
-    // 价格不脱敏，数量和总值脱敏
-    if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0 ? p.toFixed(p<1?4:2) : '--';
-    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q, false);
-    if($el(`v_${k}`)) $el(`v_${k}`).textContent = formatNum(v); // 使用 formatNum
-    updateChangeCell($el(`chg_${k}`), changes[k], c.isStable);
-  });
-  stockConfig.forEach(s => {
-    const k = s.symbol.toLowerCase();
-    const p = prices[k]||0; const q = quantities[k]||0; const v = p*q; sTotal += v;
-    if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
-    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q, false);
+  let cTotal=0, sTotal=0;
+  cryptoConfig.forEach(c=>{ const k=c.symbol.toLowerCase(); const p=prices[k]||0; const q=quantities[k]||0; const v=p*q; cTotal+=v; 
+    if($el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(p<1?4:2):'--';
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q,false);
     if($el(`v_${k}`)) $el(`v_${k}`).textContent = formatNum(v);
-    let chgPct = 0;
-    if (!s.isCash && p > 0 && prevCloses[k] > 0) chgPct = ((p - prevCloses[k]) / prevCloses[k]) * 100;
-    updateChangeCell($el(`chg_${k}`), chgPct, s.isCash);
+    updateChg($el(`chg_${k}`), changes[k], c.isStable);
+  });
+  stockConfig.forEach(s=>{ const k=s.symbol.toLowerCase(); const p=prices[k]||0; const q=quantities[k]||0; const v=p*q; sTotal+=v; 
+    if(!s.isCash && $el(`p_${k}`)) $el(`p_${k}`).textContent = p>0?p.toFixed(2):'--';
+    if($el(`q_${k}`)) $el(`q_${k}`).textContent = formatNum(q,false);
+    if($el(`v_${k}`)) $el(`v_${k}`).textContent = formatNum(v);
+    let pct=0; if(!s.isCash && p>0 && prevCloses[k]>0) pct = ((p-prevCloses[k])/prevCloses[k])*100;
+    updateChg($el(`chg_${k}`), pct, s.isCash);
   });
   const all = cTotal + sTotal;
-  // 更新表头总值 (脱敏)
-  $el('cryptoTotalDisplay').textContent = formatNum(cTotal);
-  $el('stockTotalDisplay').textContent = formatNum(sTotal);
-  $el('headerTotal').textContent = formatNum(all);
-  
-  checkHistory(all); 
-  if(chartPie) refreshCharts(); 
+  $el('cryptoTotalDisplay').textContent = formatNum(cTotal); $el('stockTotalDisplay').textContent = formatNum(sTotal); $el('headerTotal').textContent = formatNum(all);
+  checkHistory(all);
+  if(chartPie) refreshCharts();
+}
+function updateChg(el, val, stable) {
+  if(!el) return;
+  if(stable) { el.textContent='0.00%'; el.className='val-cell trend-flat'; return; }
+  if(val>0) { el.textContent='+'+val.toFixed(2)+'%'; el.className='val-cell trend-up'; }
+  else if(val<0) { el.textContent=val.toFixed(2)+'%'; el.className='val-cell trend-down'; }
+  else { el.textContent='0.00%'; el.className='val-cell trend-flat'; }
 }
 
-function updateChangeCell(el, val, isStable) {
-    if (!el) return;
-    if (isStable) { el.textContent = '0.00%'; el.className = 'val-cell trend-flat'; return; }
-    if (val > 0) { el.textContent = '+' + val.toFixed(2) + '%'; el.className = 'val-cell trend-up'; }
-    else if (val < 0) { el.textContent = val.toFixed(2) + '%'; el.className = 'val-cell trend-down'; }
-    else { el.textContent = '0.00%'; el.className = 'val-cell trend-flat'; }
+function checkHistory(total) {
+  const d = new Date(); const pad=n=>n<10?'0'+n:n;
+  const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
+  if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
+    if(isDataComplete()) {
+      hourlyComb.push({x: label, y: total});
+      refreshCharts();
+      saveToCloud(false);
+    }
+  }
 }
 
-// 5. Modal Logic
-function openConfigModal() { $el('configModal').style.display = 'flex'; renderConfigList(); }
-function closeConfigModal() { $el('configModal').style.display = 'none'; }
-function renderConfigList() { renderCryptoList(); renderStockList(); }
-function renderCryptoList() {
-  const list = $el('cryptoConfigList'); list.innerHTML = '';
-  cryptoConfig.forEach((item, idx) => {
-    const k = item.symbol.toLowerCase();
-    const isFixed = (item.symbol === 'USDT');
-    const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('crypto', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
-    const btnDown = idx < cryptoConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('crypto', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
-    const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeCrypto(${idx})"></i>` : `<span style="width:24px"></span>`;
-    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
+// ================= 4. 设置 & 弹窗 =================
+function openConfigModal() { $el('configModal').style.display='flex'; renderConfigList(); }
+function closeConfigModal() { $el('configModal').style.display='none'; }
+function renderConfigList() {
+  const cL = $el('cryptoConfigList'); cL.innerHTML='';
+  cryptoConfig.forEach((item,i) => {
+    const k=item.symbol.toLowerCase(); const isFix=(item.symbol==='USDT');
+    const btns = `<div class="action-group">${!isFix?`<i class="fas fa-trash-alt btn-icon btn-delete" onclick="rmItem('crypto',${i})"></i>`:''}</div>`;
+    cL.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updQty('${k}',this.value)">${btns}</li>`);
+  });
+  const sL = $el('stockConfigList'); sL.innerHTML='';
+  stockConfig.forEach((item,i) => {
+    const k=item.symbol.toLowerCase(); const isFix=(item.symbol==='USD');
+    const btns = `<div class="action-group">${!isFix?`<i class="fas fa-trash-alt btn-icon btn-delete" onclick="rmItem('stock',${i})"></i>`:''}</div>`;
+    sL.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updQty('${k}',this.value)">${btns}</li>`);
   });
 }
-function renderStockList() {
-  const list = $el('stockConfigList'); list.innerHTML = '';
-  stockConfig.forEach((item, idx) => {
-    const k = item.symbol.toLowerCase();
-    const isFixed = (item.symbol === 'USD');
-    const btnUp = idx > 0 ? `<i class="fas fa-arrow-up btn-icon" onclick="moveAsset('stock', ${idx}, -1)"></i>` : `<i class="fas fa-arrow-up btn-icon btn-disabled"></i>`;
-    const btnDown = idx < stockConfig.length - 1 ? `<i class="fas fa-arrow-down btn-icon" onclick="moveAsset('stock', ${idx}, 1)"></i>` : `<i class="fas fa-arrow-down btn-icon btn-disabled"></i>`;
-    const btnDel = !isFixed ? `<i class="fas fa-trash-alt btn-icon btn-delete" onclick="removeStock(${idx})"></i>` : `<span style="width:24px"></span>`;
-    list.insertAdjacentHTML('beforeend', `<li class="config-item"><span class="config-symbol">${item.symbol}</span><input type="number" class="config-qty" value="${quantities[k]}" oninput="updateQty('${k}', this.value)"><div class="action-group">${btnUp}${btnDown}${btnDel}</div></li>`);
-  });
-}
-window.moveAsset = function(type, idx, dir) {
-  const arr = (type === 'crypto') ? cryptoConfig : stockConfig;
-  const targetIdx = idx + dir;
-  if (targetIdx < 0 || targetIdx >= arr.length) return;
-  [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
-  renderConfigList(); renderUI(); saveToCloud(true);
-  if (type === 'crypto') startBinanceWS(); else initStockDataAndWS();
-};
-window.updateQty = function(key, val) { quantities[key] = parseFloat(val) || 0; recalc(); debounceSave(); };
+window.updQty = (k,v) => { quantities[k]=parseFloat(v)||0; recalc(); debounceSave(); };
+window.rmItem = (type,i) => { if(type==='crypto') cryptoConfig.splice(i,1); else stockConfig.splice(i,1); renderConfigList(); saveToCloud(true); renderUI(); if(type==='crypto') startBinanceWS(); else initStockDataAndWS(); };
 function addCryptoAsset() {
-  const sym = $el('newCryptoSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newCryptoQty').value)||0;
-  if(!sym) return; if(cryptoConfig.find(c => c.symbol === sym)) return alert('已存在');
-  cryptoConfig.push({ symbol: sym, wsKey: sym.toLowerCase() + 'usdt' }); quantities[sym.toLowerCase()] = qty;
-  $el('newCryptoSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS();
+  const s=$el('newCryptoSymbol').value.toUpperCase().trim(); const q=parseFloat($el('newCryptoQty').value)||0;
+  if(!s || cryptoConfig.find(c=>c.symbol===s)) return;
+  cryptoConfig.push({symbol:s, wsKey:s.toLowerCase()+'usdt'}); quantities[s.toLowerCase()]=q;
+  $el('newCryptoSymbol').value=''; renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS();
 }
-function removeCrypto(idx) { cryptoConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); startBinanceWS(); }
 function addStockAsset() {
-  const sym = $el('newStockSymbol').value.toUpperCase().trim(); const qty = parseFloat($el('newStockQty').value)||0;
-  if(!sym) return; if(stockConfig.find(s => s.symbol === sym)) return alert('已存在');
-  stockConfig.push({ symbol: sym }); quantities[sym.toLowerCase()] = qty;
-  $el('newStockSymbol').value = ''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS();
+  const s=$el('newStockSymbol').value.toUpperCase().trim(); const q=parseFloat($el('newStockQty').value)||0;
+  if(!s || stockConfig.find(x=>x.symbol===s)) return;
+  stockConfig.push({symbol:s}); quantities[s.toLowerCase()]=q;
+  $el('newStockSymbol').value=''; renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS();
 }
-function removeStock(idx) { stockConfig.splice(idx, 1); renderConfigList(); saveToCloud(true); renderUI(); initStockDataAndWS(); }
-function resetToDefault() { if(confirm('重置将清空所有数据，确定吗？')) { cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO)); stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK)); quantities={}; hourlyComb=[]; saveToCloud(true); location.reload(); } }
+function resetToDefault() {
+  if(confirm("确定清空数据？")) {
+    cryptoConfig=JSON.parse(JSON.stringify(DEFAULT_CRYPTO));
+    stockConfig=JSON.parse(JSON.stringify(DEFAULT_STOCK));
+    quantities={}; hourlyComb=[];
+    saveToCloud(true); location.reload();
+  }
+}
 
-// 6. Services & Charts
+// ================= 5. 市场数据 (WS/API) =================
 function startBinanceWS() {
   if(binanceWS) binanceWS.close();
-  const streams = cryptoConfig.filter(c => c.wsKey).map(c => c.wsKey + '@ticker').join('/');
-  if(streams) {
-    binanceWS = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
-    binanceWS.onopen = () => { safeClassAdd('wsBinanceDot', 'active'); };
-    binanceWS.onclose = () => { safeClassRemove('wsBinanceDot', 'active'); setTimeout(startBinanceWS, 5000); };
-    binanceWS.onmessage = (evt) => {
+  const s = cryptoConfig.filter(c=>c.wsKey).map(c=>c.wsKey+'@ticker').join('/');
+  if(s) {
+    binanceWS = new WebSocket("wss://stream.binance.com:9443/stream?streams="+s);
+    binanceWS.onopen = () => safeClassAdd('wsBinanceDot','active');
+    binanceWS.onclose = () => { safeClassRemove('wsBinanceDot','active'); setTimeout(startBinanceWS,5000); };
+    binanceWS.onmessage = (e) => {
       try {
-        const msg = JSON.parse(evt.data);
-        const symbol = cryptoConfig.find(c => c.wsKey && msg.stream.includes(c.wsKey));
-        if(symbol) { 
-            const k = symbol.symbol.toLowerCase(); prices[k] = parseFloat(msg.data.c); changes[k] = parseFloat(msg.data.P); recalc();
-        }
-      } catch(e){}
+        const m=JSON.parse(e.data); const sym=cryptoConfig.find(c=>c.wsKey&&m.stream.includes(c.wsKey));
+        if(sym) { const k=sym.symbol.toLowerCase(); prices[k]=parseFloat(m.data.c); changes[k]=parseFloat(m.data.P); recalc(); }
+      } catch(err){}
     };
   }
 }
 async function initStockDataAndWS() {
-  safeClassRemove('wsFinnhubDot', 'active');
-  const symbols = stockConfig.filter(s => !s.isCash).map(s => s.symbol);
-  if(symbols.length === 0) return;
-  const promises = symbols.map(sym => fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_TOKEN}`).then(r=>r.json()).then(d=>({s:sym, p:d.c, pc:d.pc})).catch(()=>null));
-  (await Promise.all(promises)).forEach(r => { 
-      if(r && r.p) { const k = r.s.toLowerCase(); prices[k] = r.p; prevCloses[k] = r.pc; }
-  });
-  safeClassAdd('wsFinnhubDot', 'active'); recalc(); 
+  safeClassRemove('wsFinnhubDot','active');
+  const syms = stockConfig.filter(s=>!s.isCash).map(s=>s.symbol);
+  if(!syms.length) return;
+  // Snapshot
+  const proms = syms.map(s => fetch(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${FINNHUB_TOKEN}`).then(r=>r.json()).then(d=>({s,p:d.c,pc:d.pc})).catch(()=>null));
+  (await Promise.all(proms)).forEach(r => { if(r&&r.p) { const k=r.s.toLowerCase(); prices[k]=r.p; prevCloses[k]=r.pc; } });
+  safeClassAdd('wsFinnhubDot','active'); recalc();
+  
+  // WS
   if(finnhubWS) finnhubWS.close();
   finnhubWS = new WebSocket(`wss://ws.finnhub.io?token=${FINNHUB_TOKEN}`);
-  finnhubWS.onopen = () => { safeClassAdd('wsFinnhubDot', 'active'); symbols.forEach(sym => finnhubWS.send(JSON.stringify({ type: 'subscribe', symbol: sym }))); };
-  finnhubWS.onclose = () => { safeClassRemove('wsFinnhubDot', 'active'); setTimeout(() => initStockDataAndWS(), 5000); };
-  finnhubWS.onmessage = (evt) => { try { const msg = JSON.parse(evt.data); if (msg.type === 'trade' && msg.data) { msg.data.forEach(t => { const k = t.s.toLowerCase(); if (prices[k] !== undefined) { prices[k] = t.p; recalc(); } }); } } catch(e) {} };
+  finnhubWS.onopen = () => { safeClassAdd('wsFinnhubDot','active'); syms.forEach(s=>finnhubWS.send(JSON.stringify({type:'subscribe',symbol:s}))); };
+  finnhubWS.onclose = () => { safeClassRemove('wsFinnhubDot','active'); setTimeout(initStockDataAndWS,5000); };
+  finnhubWS.onmessage = (e) => {
+    try { const m=JSON.parse(e.data); if(m.type==='trade'&&m.data) { m.data.forEach(t=>{ const k=t.s.toLowerCase(); if(prices[k]!==undefined){prices[k]=t.p; recalc();} }); } } catch(err){}
+  };
 }
 
+// ================= 6. 图表 =================
 function initCharts() {
   if(chartLine) chartLine.destroy(); if(chartPie) chartPie.destroy();
-  chartLine = new Chart($el('chartHourComb').getContext('2d'), { 
-    type: 'line', 
-    data: { datasets: [{ label: '总资产', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, parsing: { xAxisKey: 'x', yAxisKey: 'y' } }] }, 
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false, 
-      plugins: { legend: { display: false } }, 
-      scales: { 
-        x: { display: false }, 
-        y: { 
-          position: 'right',
-          // ★ 隐私模式：隐藏Y轴刻度文字
-          ticks: { callback: (v) => isPrivacyMode ? '' : v } 
-        } 
-      } 
-    } 
+  
+  chartLine = new Chart($el('chartHourComb').getContext('2d'), {
+    type: 'line',
+    data: { datasets: [{ label:'总值', data:[], borderColor:'#38bdf8', backgroundColor:'rgba(56,189,248,0.1)', fill:true, tension:0.4, parsing:{xAxisKey:'x',yAxisKey:'y'} }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{position:'right', ticks:{callback:(v)=>isPrivacyMode?'':v}}} }
   });
-  chartPie = new Chart($el('chartAssetPie').getContext('2d'), { 
-    type: 'doughnut', 
-    data: { labels: [], datasets: [{ data: [], borderWidth: 0, backgroundColor: ['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] }, 
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false, 
-      plugins: { 
-        legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8' } }, 
-        tooltip: { callbacks: { 
-          label: function(ctx) { 
-            // ★ 隐私模式：Tooltip 脱敏
-            const v = ctx.parsed; 
-            const label = ctx.label.split(' ')[0];
-            return isPrivacyMode ? `${label}: ****` : `${label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)}`; 
-          } 
-        } } 
-      } 
-    } 
+  
+  chartPie = new Chart($el('chartAssetPie').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels:[], datasets:[{ data:[], borderWidth:0, backgroundColor:['#38bdf8','#4ade80','#fbbf24','#f87171','#a78bfa','#2dd4bf','#fb923c','#94a3b8'] }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'right',labels:{boxWidth:10,color:'#94a3b8'}}, tooltip:{callbacks:{label:function(c){ 
+      const v=c.parsed; const l=c.label.split(' ')[0]; return isPrivacyMode ? `${l}: ****` : `${l}: ${new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(v)}`;
+    }}} } }
   });
 }
 
 function refreshCharts() {
   if(!chartLine || !chartPie) return;
-  
-  // 更新图表配置以响应隐私模式
-  chartLine.options.scales.y.ticks.callback = (v) => isPrivacyMode ? '' : new Intl.NumberFormat('en-US', { notation: "compact" }).format(v);
-  chartLine.data.datasets[0].data = hourlyComb; 
+  // 更新隐私刻度
+  chartLine.options.scales.y.ticks.callback = (v) => isPrivacyMode ? '' : new Intl.NumberFormat('en-US',{notation:"compact"}).format(v);
+  chartLine.data.datasets[0].data = hourlyComb;
   chartLine.update();
-
-  let labels = [], data = [];
-  [...cryptoConfig, ...stockConfig].forEach(item => { const k = item.symbol.toLowerCase(); const v = (prices[k]||0) * (quantities[k]||0); if(v > 0) { labels.push(item.symbol); data.push(v); } });
-  const pieTotal = data.reduce((a,b)=>a+b, 0);
-  const labelsWithPct = labels.map((l, i) => { const p = pieTotal > 0 ? ((data[i] / pieTotal) * 100).toFixed(1) : '0.0'; return `${l} ${p}%`; });
-  chartPie.data.labels = labelsWithPct; chartPie.data.datasets[0].data = data; chartPie.update();
+  
+  let lbs=[], dat=[];
+  [...cryptoConfig, ...stockConfig].forEach(i => { const k=i.symbol.toLowerCase(); const v=(prices[k]||0)*(quantities[k]||0); if(v>0) { lbs.push(i.symbol); dat.push(v); } });
+  const tot = dat.reduce((a,b)=>a+b,0);
+  const lbsP = lbs.map((l,i) => `${l} ${tot>0?((dat[i]/tot)*100).toFixed(1):0.0}%`);
+  chartPie.data.labels = lbsP; chartPie.data.datasets[0].data = dat;
+  chartPie.update();
 }
-
-function checkHistory(total) {
-  const d = new Date(); const pad = n => n<10?'0'+n:n;
-  const label = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
-  if(!hourlyComb.length || hourlyComb[hourlyComb.length-1].x !== label) {
-    if (isDataComplete()) { hourlyComb.push({ x: label, y: total }); refreshCharts(); saveToCloud(false); }
-  }
-}
-
-window.onload = loadConfig;
 </script>
 </body>
 </html>
