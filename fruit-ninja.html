@@ -307,6 +307,12 @@
 
         // 初始化MediaPipe Hands
         async function initHandTracking() {
+            // 先检查浏览器是否支持
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('您的浏览器不支持摄像头访问！请使用最新版Chrome、Firefox或Edge浏览器。');
+                return false;
+            }
+
             hands = new Hands({
                 locateFile: (file) => {
                     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
@@ -323,14 +329,26 @@
             hands.onResults(onResults);
 
             try {
+                console.log('正在请求摄像头权限...');
+                
+                // 请求摄像头权限
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: 640, height: 480 } 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    } 
                 });
+                
+                console.log('摄像头权限已获取！');
                 video.srcObject = stream;
                 
                 await new Promise((resolve) => {
                     video.onloadedmetadata = resolve;
                 });
+
+                await video.play();
+                console.log('摄像头已启动！');
 
                 camera = new Camera(video, {
                     onFrame: async () => {
@@ -343,8 +361,37 @@
                 camera.start();
                 return true;
             } catch (error) {
-                console.error('无法访问摄像头:', error);
-                alert('无法访问摄像头，请确保已授予权限！');
+                console.error('摄像头错误详情:', error);
+                
+                let errorMessage = '无法访问摄像头！\n\n';
+                
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage += '原因：您拒绝了摄像头权限\n\n';
+                    errorMessage += '解决方法：\n';
+                    errorMessage += '1. 点击地址栏左侧的 🔒 或 ⓘ 图标\n';
+                    errorMessage += '2. 找到"摄像头"选项\n';
+                    errorMessage += '3. 选择"允许"\n';
+                    errorMessage += '4. 刷新页面重试';
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage += '原因：未检测到摄像头设备\n\n';
+                    errorMessage += '请确保：\n';
+                    errorMessage += '1. 摄像头已正确连接\n';
+                    errorMessage += '2. 没有其他程序占用摄像头';
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    errorMessage += '原因：摄像头被其他程序占用\n\n';
+                    errorMessage += '请关闭其他使用摄像头的程序（如：\n';
+                    errorMessage += '- 视频会议软件(Zoom, Teams等)\n';
+                    errorMessage += '- 其他浏览器标签页\n';
+                    errorMessage += '- 摄像头应用';
+                } else if (error.name === 'OverconstrainedError') {
+                    errorMessage += '原因：摄像头不支持请求的分辨率\n\n';
+                    errorMessage += '正在尝试使用默认设置...';
+                } else {
+                    errorMessage += `错误类型：${error.name}\n`;
+                    errorMessage += `详细信息：${error.message}`;
+                }
+                
+                alert(errorMessage);
                 return false;
             }
         }
