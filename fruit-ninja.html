@@ -212,6 +212,9 @@
         let slashTrail = [];
         let hands = null;
         let isHandTrackingActive = false;
+        let smoothedHandPosition = null;  // 添加平滑后的手部位置
+        const smoothingFactor = 0.3;  // 平滑系数，越小越平滑但延迟越大
+        let lastSlashSoundTime = 0;  // 音效节流
 
         // 音效系统
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -378,7 +381,7 @@
 
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 1,
+                modelComplexity: 0,  // 从1改为0，使用最快的模型
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -390,8 +393,8 @@
                 
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
+                        width: { ideal: 320 },  // 从640降到320
+                        height: { ideal: 240 }, // 从480降到240
                         facingMode: 'user'
                     } 
                 });
@@ -457,14 +460,25 @@
                 const landmarks = results.multiHandLandmarks[0];
                 const indexTip = landmarks[8];
                 
-                previousHandPosition = handPosition;
-                handPosition = {
+                const newPosition = {
                     x: (1 - indexTip.x) * canvas.width,
                     y: indexTip.y * canvas.height
                 };
+                
+                // 平滑处理
+                if (!smoothedHandPosition) {
+                    smoothedHandPosition = newPosition;
+                } else {
+                    smoothedHandPosition.x += (newPosition.x - smoothedHandPosition.x) * smoothingFactor;
+                    smoothedHandPosition.y += (newPosition.y - smoothedHandPosition.y) * smoothingFactor;
+                }
+                
+                previousHandPosition = handPosition;
+                handPosition = { ...smoothedHandPosition };
             } else {
                 previousHandPosition = handPosition;
                 handPosition = null;
+                smoothedHandPosition = null;
             }
         }
 
@@ -494,9 +508,11 @@
                     slashTrail.shift();
                 }
                 
-                // 播放滑动音效
-                if (speed > 15) {
+                // 播放滑动音效（添加节流，每100ms最多播放一次）
+                const now = Date.now();
+                if (speed > 15 && now - lastSlashSoundTime > 100) {
                     playSlashSound();
+                    lastSlashSoundTime = now;
                 }
             }
 
