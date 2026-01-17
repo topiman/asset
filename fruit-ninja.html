@@ -192,8 +192,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1620248357/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"></script>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -204,7 +202,7 @@
         canvas.height = window.innerHeight;
 
         // 游戏状态
-        let gameState = 'start'; // 'start', 'playing', 'ended'
+        let gameState = 'start';
         let score = 0;
         let timeLeft = 60;
         let fruits = [];
@@ -213,7 +211,7 @@
         let previousHandPosition = null;
         let slashTrail = [];
         let hands = null;
-        let camera = null;
+        let isHandTrackingActive = false;
 
         // 水果类型
         const fruitTypes = [
@@ -307,7 +305,6 @@
 
         // 初始化MediaPipe Hands
         async function initHandTracking() {
-            // 先检查浏览器是否支持
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert('您的浏览器不支持摄像头访问！请使用最新版Chrome、Firefox或Edge浏览器。');
                 return false;
@@ -331,7 +328,6 @@
             try {
                 console.log('正在请求摄像头权限...');
                 
-                // 请求摄像头权限
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         width: { ideal: 640 },
@@ -350,15 +346,10 @@
                 await video.play();
                 console.log('摄像头已启动！');
 
-                camera = new Camera(video, {
-                    onFrame: async () => {
-                        await hands.send({ image: video });
-                    },
-                    width: 640,
-                    height: 480
-                });
+                // 启动手部追踪循环
+                isHandTrackingActive = true;
+                detectHands();
                 
-                camera.start();
                 return true;
             } catch (error) {
                 console.error('摄像头错误详情:', error);
@@ -379,13 +370,7 @@
                     errorMessage += '2. 没有其他程序占用摄像头';
                 } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
                     errorMessage += '原因：摄像头被其他程序占用\n\n';
-                    errorMessage += '请关闭其他使用摄像头的程序（如：\n';
-                    errorMessage += '- 视频会议软件(Zoom, Teams等)\n';
-                    errorMessage += '- 其他浏览器标签页\n';
-                    errorMessage += '- 摄像头应用';
-                } else if (error.name === 'OverconstrainedError') {
-                    errorMessage += '原因：摄像头不支持请求的分辨率\n\n';
-                    errorMessage += '正在尝试使用默认设置...';
+                    errorMessage += '请关闭其他使用摄像头的程序';
                 } else {
                     errorMessage += `错误类型：${error.name}\n`;
                     errorMessage += `详细信息：${error.message}`;
@@ -396,10 +381,21 @@
             }
         }
 
+        // 手部检测循环
+        async function detectHands() {
+            if (!isHandTrackingActive) return;
+            
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                await hands.send({ image: video });
+            }
+            
+            requestAnimationFrame(detectHands);
+        }
+
         function onResults(results) {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                const indexTip = landmarks[8]; // 食指尖端
+                const indexTip = landmarks[8];
                 
                 previousHandPosition = handPosition;
                 handPosition = {
@@ -416,7 +412,7 @@
         function spawnFruit() {
             const x = Math.random() * canvas.width;
             const y = canvas.height;
-            const isBomb = Math.random() < 0.15; // 15%概率生成炸弹
+            const isBomb = Math.random() < 0.15;
             fruits.push(new Fruit(x, y, isBomb));
         }
 
@@ -428,7 +424,6 @@
             const dy = handPosition.y - previousHandPosition.y;
             const speed = Math.sqrt(dx * dx + dy * dy);
 
-            // 添加刀光轨迹
             if (speed > 5) {
                 slashTrail.push({
                     x: handPosition.x,
@@ -440,7 +435,6 @@
                 }
             }
 
-            // 只有快速挥动才能切水果
             if (speed < 15) return;
 
             fruits.forEach(fruit => {
@@ -465,21 +459,18 @@
             });
         }
 
-        // 创建粒子效果
         function createParticles(x, y, color) {
             for (let i = 0; i < 20; i++) {
                 particles.push(new Particle(x, y, color));
             }
         }
 
-        // 创建爆炸效果
         function createExplosion(x, y, color) {
             for (let i = 0; i < 30; i++) {
                 particles.push(new Particle(x, y, color));
             }
         }
 
-        // 绘制刀光
         function drawSlash() {
             if (slashTrail.length < 2) return;
 
@@ -514,7 +505,6 @@
             slashTrail = slashTrail.filter(p => p.life > 0);
         }
 
-        // 绘制手部光标
         function drawCursor() {
             if (!handPosition) return;
 
@@ -536,7 +526,6 @@
             ctx.restore();
         }
 
-        // 游戏主循环
         let lastTime = Date.now();
         let fruitSpawnTimer = 0;
         let gameTimer = 0;
@@ -549,14 +538,12 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (gameState === 'playing') {
-                // 生成水果
                 fruitSpawnTimer += deltaTime;
                 if (fruitSpawnTimer > 0.8) {
                     spawnFruit();
                     fruitSpawnTimer = 0;
                 }
 
-                // 更新计时器
                 gameTimer += deltaTime;
                 if (gameTimer >= 1) {
                     timeLeft--;
@@ -566,28 +553,23 @@
                     }
                 }
 
-                // 检测切割
                 checkSlice();
 
-                // 更新和绘制水果
                 fruits = fruits.filter(fruit => {
                     fruit.update();
                     fruit.draw();
                     return !fruit.isOffScreen() && !fruit.sliced;
                 });
 
-                // 更新和绘制粒子
                 particles = particles.filter(particle => {
                     particle.update();
                     particle.draw();
                     return particle.life > 0;
                 });
 
-                // 绘制刀光和光标
                 drawSlash();
                 drawCursor();
 
-                // 更新UI
                 document.getElementById('score').textContent = `得分: ${score}`;
                 document.getElementById('timer').textContent = `时间: ${timeLeft}`;
             }
@@ -614,7 +596,6 @@
             document.getElementById('endScreen').style.display = 'flex';
         }
 
-        // 事件监听
         document.getElementById('startBtn').addEventListener('click', async () => {
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
@@ -635,7 +616,6 @@
             startGame();
         });
 
-        // 窗口调整
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
