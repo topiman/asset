@@ -213,6 +213,66 @@
         let hands = null;
         let isHandTrackingActive = false;
 
+        // 音效系统
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // 创建滑动音效
+        function playSlashSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // 创建切水果音效
+        function playCutSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+            
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.15);
+        }
+
+        // 创建炸弹爆炸音效
+        function playBombSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(100, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.3);
+            
+            gainNode.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+
         // 水果类型
         const fruitTypes = [
             { emoji: '🍎', color: '#FF0000', points: 10 },
@@ -230,11 +290,11 @@
                 this.x = x;
                 this.y = y;
                 this.vx = (Math.random() - 0.5) * 8;
-                this.vy = -15 - Math.random() * 10;
+                this.vy = -25 - Math.random() * 15;
                 this.gravity = 0.5;
                 this.rotation = Math.random() * Math.PI * 2;
                 this.rotationSpeed = (Math.random() - 0.5) * 0.2;
-                this.size = 50 + Math.random() * 30;
+                this.size = 100 + Math.random() * 60;
                 this.isBomb = isBomb;
                 this.sliced = false;
                 
@@ -433,6 +493,11 @@
                 if (slashTrail.length > 15) {
                     slashTrail.shift();
                 }
+                
+                // 播放滑动音效
+                if (speed > 15) {
+                    playSlashSound();
+                }
             }
 
             if (speed < 15) return;
@@ -451,9 +516,11 @@
                     if (fruit.isBomb) {
                         score = Math.max(0, score - 20);
                         createExplosion(fruit.x, fruit.y, '#FF4500');
+                        playBombSound(); // 播放炸弹音效
                     } else {
                         score += fruit.points;
                         createParticles(fruit.x, fruit.y, fruit.color);
+                        playCutSound(); // 播放切水果音效
                     }
                 }
             });
@@ -597,6 +664,11 @@
         }
 
         document.getElementById('startBtn').addEventListener('click', async () => {
+            // 启动音频上下文
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+            
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
             
