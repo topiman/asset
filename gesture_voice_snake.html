@@ -585,9 +585,9 @@
             const dx = fingerAvg.x - wrist.x;
             const dy = fingerAvg.y - wrist.y;
 
-            // 判断主要方向
+            // 判断主要方向（因为摄像头是镜像的，左右需要反转）
             if (Math.abs(dx) > Math.abs(dy)) {
-                return dx > 0 ? 'right' : 'left';
+                return dx > 0 ? 'left' : 'right';  // 反转左右
             } else {
                 return dy > 0 ? 'down' : 'up';
             }
@@ -614,7 +614,8 @@
             
             recognition.lang = 'zh-CN';
             recognition.continuous = true;
-            recognition.interimResults = false;
+            recognition.interimResults = true;  // 改为true，更快响应
+            recognition.maxAlternatives = 3;    // 获取多个备选结果
 
             recognition.onresult = (event) => {
                 const last = event.results.length - 1;
@@ -622,19 +623,31 @@
                 
                 console.log('识别到命令:', command);
                 
-                // 识别方向命令
-                if (command.includes('上') || command.includes('shang')) {
+                // 识别方向命令 - 添加更多可能的表达
+                if (command.includes('上') || command === '上' || 
+                    command.includes('向上') || command.includes('往上') || 
+                    command.includes('shang') || command.includes('up')) {
                     changeDirection('up');
                     updateVoiceIndicator('⬆️ 向上');
-                } else if (command.includes('下') || command.includes('xia')) {
+                } else if (command.includes('下') || command === '下' || 
+                           command.includes('向下') || command.includes('往下') || 
+                           command.includes('xia') || command.includes('down')) {
                     changeDirection('down');
                     updateVoiceIndicator('⬇️ 向下');
-                } else if (command.includes('左') || command.includes('zuo')) {
+                } else if (command.includes('左') || command === '左' || 
+                           command.includes('向左') || command.includes('往左') || 
+                           command.includes('zuo') || command.includes('left')) {
                     changeDirection('left');
                     updateVoiceIndicator('⬅️ 向左');
-                } else if (command.includes('右') || command.includes('you')) {
+                } else if (command.includes('右') || command === '右' || 
+                           command.includes('向右') || command.includes('往右') || 
+                           command.includes('you') || command.includes('right')) {
                     changeDirection('right');
                     updateVoiceIndicator('➡️ 向右');
+                } else {
+                    // 显示未识别的命令
+                    console.log('未匹配的命令:', command);
+                    updateVoiceIndicator('❓ 未识别: ' + command);
                 }
             };
 
@@ -644,7 +657,12 @@
                     // 静默处理无语音错误
                     return;
                 }
-                updateVoiceIndicator('🔴 识别错误，请重试');
+                updateVoiceIndicator('🔴 识别错误: ' + event.error);
+            };
+
+            recognition.onstart = () => {
+                console.log('🎤 语音识别已启动，可以开始说话');
+                updateVoiceIndicator('🎤 正在监听，请说话...');
             };
 
             recognition.onend = () => {
@@ -702,8 +720,10 @@
                 try {
                     recognition.start();
                     isListening = true;
+                    console.log('✅ 语音识别已启动');
+                    updateVoiceIndicator('🎤 正在监听...');
                 } catch (e) {
-                    console.log('语音识别已在运行');
+                    console.log('⚠️ 语音识别已在运行:', e);
                 }
             }
         }
