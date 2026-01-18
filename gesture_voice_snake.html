@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 体感贪吃蛇</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #ff6b9d;
+            --secondary: #c44569;
+            --accent: #ffa502;
+            --bg-dark: #1e3a5f;
+            --bg-light: #f8f9fa;
+            --success: #26de81;
+            --text-dark: #2c3e50;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 700px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,107,157,0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 0.3; }
+        }
+
+        h1 {
+            font-family: 'Fredoka', cursive;
+            color: var(--primary);
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 0px var(--secondary);
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .mode-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mode-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .mode-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            box-shadow: 0 8px 30px rgba(255, 107, 157, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-around;
+            margin: 25px 0;
+            gap: 15px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .info-item {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 20px;
+            font-size: 1.1em;
+            font-weight: 700;
+            box-shadow: 0 5px 20px rgba(245, 87, 108, 0.3);
+            font-family: 'Fredoka', cursive;
+            min-width: 120px;
+        }
+
+        .status-indicator {
+            background: linear-gradient(135deg, var(--success) 0%, #20bf6b 100%);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-weight: 600;
+            margin: 15px 0;
+            box-shadow: 0 5px 20px rgba(38, 222, 129, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        #gameCanvas {
+            border: 6px solid var(--primary);
+            border-radius: 20px;
+            background: #f0f4ff;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            display: block;
+            margin: 20px auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .controls {
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 700;
+            margin: 5px;
+            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            font-family: 'Fredoka', cursive;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+
+        button:hover::after {
+            width: 200px;
+            height: 200px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 35px rgba(102, 126, 234, 0.5);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        .camera-container {
+            position: relative;
+            margin: 20px auto;
+            display: none;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+
+        .camera-container.active {
+            display: block;
+        }
+
+        #webcam {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 20px;
+            transform: scaleX(-1);
+        }
+
+        .hand-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .voice-indicator {
+            display: none;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--accent) 0%, #ff6348 100%);
+            border-radius: 20px;
+            color: white;
+            font-weight: 700;
+            font-size: 1.3em;
+            box-shadow: 0 10px 30px rgba(255, 165, 2, 0.4);
+            position: relative;
+            z-index: 1;
+        }
+
+        .voice-indicator.active {
+            display: block;
+            animation: voicePulse 1s ease-in-out infinite;
+        }
+
+        @keyframes voicePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .instructions {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe5a8 100%);
+            border: 4px solid var(--accent);
+            border-radius: 20px;
+            padding: 25px;
+            margin-top: 25px;
+            text-align: left;
+            box-shadow: 0 8px 25px rgba(255, 165, 2, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .instructions h3 {
+            color: var(--secondary);
+            margin-bottom: 15px;
+            font-family: 'Fredoka', cursive;
+            font-size: 1.5em;
+        }
+
+        .instructions p {
+            color: var(--text-dark);
+            line-height: 2;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .instructions strong {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        #game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 50px;
+            border-radius: 30px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #game-over h2 {
+            color: var(--primary);
+            font-size: 3em;
+            margin-bottom: 20px;
+            font-family: 'Fredoka', cursive;
+        }
+
+        #game-over p {
+            font-size: 1.5em;
+            margin: 15px 0;
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 999;
+            backdrop-filter: blur(5px);
+        }
+
+        .gesture-hint {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            color: var(--primary);
+            z-index: 10;
+            display: none;
+        }
+
+        .gesture-hint.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2em; }
+            .game-container { padding: 25px; }
+            #gameCanvas { width: 100%; height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎮 体感贪吃蛇</h1>
+        <p class="subtitle">未来式体感游戏体验</p>
+
+        <div class="mode-switch">
+            <button class="mode-btn active" id="gestureBtn" onclick="switchMode('gesture')">
+                ✋ 手势控制
+            </button>
+            <button class="mode-btn" id="voiceBtn" onclick="switchMode('voice')">
+                🎤 语音控制
+            </button>
+        </div>
+
+        <div class="status-indicator" id="statusIndicator">
+            <span class="status-dot"></span>
+            <span id="statusText">等待开始...</span>
+        </div>
+        
+        <div class="info-bar">
+            <div class="info-item">
+                分数: <span id="score">0</span>
+            </div>
+            <div class="info-item">
+                最高分: <span id="highScore">0</span>
+            </div>
+            <div class="info-item">
+                速度: <span id="speedDisplay">300ms</span>
+            </div>
+        </div>
+
+        <div class="camera-container" id="cameraContainer">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas class="hand-overlay" id="handCanvas"></canvas>
+            <div class="gesture-hint" id="gestureHint">👆 检测中...</div>
+        </div>
+
+        <div class="voice-indicator" id="voiceIndicator">
+            🎤 说出方向：上、下、左、右
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startGame()">开始游戏 🎮</button>
+            <button onclick="pauseGame()">暂停/继续 ⏸️</button>
+        </div>
+
+        <div class="instructions">
+            <h3>🎯 游戏说明</h3>
+            <p><strong>手势控制模式：</strong><br>
+            ✋ 将手伸向摄像头<br>
+            👆 手指向上 = 蛇向上<br>
+            👇 手指向下 = 蛇向下<br>
+            👈 手指向左 = 蛇向左<br>
+            👉 手指向右 = 蛇向右</p>
+            
+            <p><strong>语音控制模式：</strong><br>
+            🎤 清晰地说出方向<br>
+            说"上" 或 "向上" = 蛇向上<br>
+            说"下" 或 "向下" = 蛇向下<br>
+            说"左" 或 "向左" = 蛇向左<br>
+            说"右" 或 "向右" = 蛇向右</p>
+            
+            <p><strong>游戏规则：</strong><br>
+            🍎 吃到苹果得10分，速度加快10ms<br>
+            ⚠️ 不要撞墙或撞到自己<br>
+            🎯 最快速度150ms，挑战你的极限！</p>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div id="game-over">
+        <h2>游戏结束！</h2>
+        <p>你的分数: <span id="finalScore">0</span></p>
+        <p>最高分: <span id="finalHighScore">0</span></p>
+        <button onclick="restartGame()">再玩一次 🔄</button>
+    </div>
+
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <script>
+        // 游戏变量
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [{x: 10, y: 10}];
+        let food = {x: 15, y: 15};
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        let gameLoop;
+        let gameStarted = false;
+        let gamePaused = false;
+        let gameSpeed = 300;
+        let currentMode = 'gesture'; // 'gesture' or 'voice'
+
+        // 手势识别变量
+        let hands;
+        let camera;
+        let lastGestureTime = 0;
+        const gestureDelay = 500; // 手势识别延迟，避免过于敏感
+
+        // 语音识别变量
+        let recognition;
+        let isListening = false;
+
+        document.getElementById('highScore').textContent = highScore;
+        document.getElementById('speedDisplay').textContent = gameSpeed + 'ms';
+
+        // 初始化手势识别
+        function initGestureRecognition() {
+            hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandsResults);
+
+            const videoElement = document.getElementById('webcam');
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (currentMode === 'gesture' && gameStarted && !gamePaused) {
+                        await hands.send({image: videoElement});
+                    }
+                },
+                width: 400,
+                height: 400
+            });
+        }
+
+        // 手势识别结果处理
+        function onHandsResults(results) {
+            const handCanvas = document.getElementById('handCanvas');
+            const handCtx = handCanvas.getContext('2d');
+            
+            handCanvas.width = results.image.width;
+            handCanvas.height = results.image.height;
+            
+            handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // 绘制手部骨架
+                drawConnectors(handCtx, landmarks, HAND_CONNECTIONS, {color: '#FF6B9D', lineWidth: 3});
+                drawLandmarks(handCtx, landmarks, {color: '#667eea', lineWidth: 2, radius: 5});
+
+                // 识别手势方向
+                const direction = detectHandDirection(landmarks);
+                if (direction) {
+                    const now = Date.now();
+                    if (now - lastGestureTime > gestureDelay) {
+                        changeDirection(direction);
+                        showGestureHint(direction);
+                        lastGestureTime = now;
+                    }
+                }
+            }
+        }
+
+        // 检测手的方向
+        function detectHandDirection(landmarks) {
+            const wrist = landmarks[0];
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            
+            // 计算手指平均位置
+            const fingerAvg = {
+                x: (indexTip.x + middleTip.x) / 2,
+                y: (indexTip.y + middleTip.y) / 2
+            };
+
+            const dx = fingerAvg.x - wrist.x;
+            const dy = fingerAvg.y - wrist.y;
+
+            // 判断主要方向
+            if (Math.abs(dx) > Math.abs(dy)) {
+                return dx > 0 ? 'right' : 'left';
+            } else {
+                return dy > 0 ? 'down' : 'up';
+            }
+        }
+
+        // 显示手势提示
+        function showGestureHint(direction) {
+            const hint = document.getElementById('gestureHint');
+            const arrows = {up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️'};
+            hint.textContent = arrows[direction] + ' ' + direction.toUpperCase();
+            hint.classList.add('active');
+            setTimeout(() => hint.classList.remove('active'), 800);
+        }
+
+        // 初始化语音识别
+        function initVoiceRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('您的浏览器不支持语音识别功能，请使用Chrome浏览器');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            recognition.lang = 'zh-CN';
+            recognition.continuous = true;
+            recognition.interimResults = false;
+
+            recognition.onresult = (event) => {
+                const last = event.results.length - 1;
+                const command = event.results[last][0].transcript.trim().toLowerCase();
+                
+                console.log('识别到命令:', command);
+                
+                // 识别方向命令
+                if (command.includes('上') || command.includes('shang')) {
+                    changeDirection('up');
+                    updateVoiceIndicator('⬆️ 向上');
+                } else if (command.includes('下') || command.includes('xia')) {
+                    changeDirection('down');
+                    updateVoiceIndicator('⬇️ 向下');
+                } else if (command.includes('左') || command.includes('zuo')) {
+                    changeDirection('left');
+                    updateVoiceIndicator('⬅️ 向左');
+                } else if (command.includes('右') || command.includes('you')) {
+                    changeDirection('right');
+                    updateVoiceIndicator('➡️ 向右');
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+                if (event.error === 'no-speech') {
+                    // 静默处理无语音错误
+                    return;
+                }
+                updateVoiceIndicator('🔴 识别错误，请重试');
+            };
+
+            recognition.onend = () => {
+                if (currentMode === 'voice' && gameStarted && !gamePaused) {
+                    recognition.start(); // 自动重启
+                }
+            };
+        }
+
+        // 更新语音指示器
+        function updateVoiceIndicator(text) {
+            const indicator = document.getElementById('voiceIndicator');
+            indicator.textContent = text;
+            setTimeout(() => {
+                indicator.textContent = '🎤 说出方向：上、下、左、右';
+            }, 1500);
+        }
+
+        // 切换控制模式
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            document.getElementById('gestureBtn').classList.toggle('active', mode === 'gesture');
+            document.getElementById('voiceBtn').classList.toggle('active', mode === 'voice');
+            
+            document.getElementById('cameraContainer').classList.toggle('active', mode === 'gesture');
+            document.getElementById('voiceIndicator').classList.toggle('active', mode === 'voice');
+            
+            if (mode === 'gesture') {
+                if (camera && gameStarted) {
+                    camera.start();
+                }
+                if (recognition && isListening) {
+                    recognition.stop();
+                    isListening = false;
+                }
+                updateStatus('手势控制已激活 ✋');
+            } else {
+                if (camera) {
+                    camera.stop();
+                }
+                if (gameStarted && !gamePaused) {
+                    startVoiceRecognition();
+                }
+                updateStatus('语音控制已激活 🎤');
+            }
+        }
+
+        // 启动语音识别
+        function startVoiceRecognition() {
+            if (!recognition) {
+                initVoiceRecognition();
+            }
+            if (recognition && !isListening) {
+                try {
+                    recognition.start();
+                    isListening = true;
+                } catch (e) {
+                    console.log('语音识别已在运行');
+                }
+            }
+        }
+
+        // 停止语音识别
+        function stopVoiceRecognition() {
+            if (recognition && isListening) {
+                recognition.stop();
+                isListening = false;
+            }
+        }
+
+        // 更新状态显示
+        function updateStatus(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        // 改变蛇的方向
+        function changeDirection(direction) {
+            if (!gameStarted || gamePaused) return;
+            
+            switch(direction) {
+                case 'up':
+                    if (dy === 0) { dx = 0; dy = -1; }
+                    break;
+                case 'down':
+                    if (dy === 0) { dx = 0; dy = 1; }
+                    break;
+                case 'left':
+                    if (dx === 0) { dx = -1; dy = 0; }
+                    break;
+                case 'right':
+                    if (dx === 0) { dx = 1; dy = 0; }
+                    break;
+            }
+        }
+
+        // 开始游戏
+        function startGame() {
+            if (gameStarted && !gamePaused) return;
+            
+            gameStarted = true;
+            gamePaused = false;
+            snake = [{x: 10, y: 10}];
+            dx = 1;
+            dy = 0;
+            score = 0;
+            gameSpeed = 300;
+            document.getElementById('score').textContent = score;
+            document.getElementById('speedDisplay').textContent = gameSpeed + 'ms';
+            generateFood();
+            
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, gameSpeed);
+            
+            // 启动相应的控制模式
+            if (currentMode === 'gesture') {
+                if (!camera) {
+                    initGestureRecognition();
+                }
+                camera.start();
+                updateStatus('游戏进行中 - 手势控制 ✋');
+            } else {
+                startVoiceRecognition();
+                updateStatus('游戏进行中 - 语音控制 🎤');
+            }
+            
+            document.getElementById('startBtn').textContent = '重新开始 🔄';
+        }
+
+        // 暂停游戏
+        function pauseGame() {
+            if (!gameStarted) return;
+            gamePaused = !gamePaused;
+            
+            if (gamePaused) {
+                if (currentMode === 'gesture' && camera) {
+                    camera.stop();
+                } else if (currentMode === 'voice') {
+                    stopVoiceRecognition();
+                }
+                updateStatus('游戏已暂停 ⏸️');
+            } else {
+                if (currentMode === 'gesture' && camera) {
+                    camera.start();
+                } else if (currentMode === 'voice') {
+                    startVoiceRecognition();
+                }
+                updateStatus('游戏继续 ▶️');
+            }
+        }
+
+        // 游戏更新
+        function update() {
+            if (gamePaused) return;
+            
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            
+            if (head.x < 0 || head.x >= tileCount || 
+                head.y < 0 || head.y >= tileCount ||
+                snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                endGame();
+                return;
+            }
+            
+            snake.unshift(head);
+            
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                document.getElementById('score').textContent = score;
+                generateFood();
+                
+                if (gameSpeed > 150) {
+                    gameSpeed -= 10;
+                    document.getElementById('speedDisplay').textContent = gameSpeed + 'ms';
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(update, gameSpeed);
+                }
+                
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScore', highScore);
+                    document.getElementById('highScore').textContent = highScore;
+                }
+            } else {
+                snake.pop();
+            }
+            
+            draw();
+        }
+
+        // 生成食物
+        function generateFood() {
+            do {
+                food.x = Math.floor(Math.random() * tileCount);
+                food.y = Math.floor(Math.random() * tileCount);
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+        }
+
+        // 绘制游戏
+        function draw() {
+            ctx.fillStyle = '#f0f4ff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#e0e8ff';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+            
+            snake.forEach((segment, index) => {
+                const gradient = ctx.createLinearGradient(
+                    segment.x * gridSize, 
+                    segment.y * gridSize,
+                    segment.x * gridSize + gridSize,
+                    segment.y * gridSize + gridSize
+                );
+                
+                if (index === 0) {
+                    gradient.addColorStop(0, '#ff6b9d');
+                    gradient.addColorStop(1, '#c44569');
+                } else {
+                    gradient.addColorStop(0, '#667eea');
+                    gradient.addColorStop(1, '#764ba2');
+                }
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(
+                    segment.x * gridSize + 1, 
+                    segment.y * gridSize + 1, 
+                    gridSize - 2, 
+                    gridSize - 2
+                );
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    segment.x * gridSize + 1, 
+                    segment.y * gridSize + 1, 
+                    gridSize - 2, 
+                    gridSize - 2
+                );
+            });
+            
+            const foodGradient = ctx.createRadialGradient(
+                food.x * gridSize + gridSize/2,
+                food.y * gridSize + gridSize/2,
+                0,
+                food.x * gridSize + gridSize/2,
+                food.y * gridSize + gridSize/2,
+                gridSize/2
+            );
+            foodGradient.addColorStop(0, '#ffa502');
+            foodGradient.addColorStop(1, '#ff6348');
+            
+            ctx.fillStyle = foodGradient;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * gridSize + gridSize/2,
+                food.y * gridSize + gridSize/2,
+                gridSize/2 - 2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+
+        // 游戏结束
+        function endGame() {
+            clearInterval(gameLoop);
+            gameStarted = false;
+            
+            if (camera) camera.stop();
+            stopVoiceRecognition();
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalHighScore').textContent = highScore;
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('game-over').style.display = 'block';
+            
+            updateStatus('游戏结束 💀');
+        }
+
+        // 重新开始
+        function restartGame() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('game-over').style.display = 'none';
+            startGame();
+        }
+
+        // 键盘控制（备用）
+        document.addEventListener('keydown', (e) => {
+            if (!gameStarted) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    if (dy === 0) changeDirection('up');
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    if (dy === 0) changeDirection('down');
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                    if (dx === 0) changeDirection('left');
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    if (dx === 0) changeDirection('right');
+                    e.preventDefault();
+                    break;
+            }
+        });
+
+        // 初始绘制
+        draw();
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', () => {
+            initVoiceRecognition();
+        });
+    </script>
+</body>
+</html>
